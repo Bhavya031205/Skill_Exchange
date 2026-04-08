@@ -1,0 +1,227 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Model
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  username     String   @unique
+  avatarUrl    String? @map("avatar_url")
+  bio          String?
+  xp           Int      @default(0)
+  level        Int      @default(1)
+  coins        Int      @default(100)
+  streakDays   Int      @default(0) @map("streak_days")
+  lastLogin    DateTime? @map("last_login")
+  rating       Float    @default(0)
+  totalRatings Int      @default(0) @map("total_ratings")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  skills           UserSkill[]
+  taughtSessions   Session[]    @relation("TeacherSessions")
+  learnedSessions  Session[]    @relation("LearnerSessions")
+  sentMessages     ChatMessage[] @relation("SenderMessages")
+  achievements     UserAchievement[]
+  inventory        UserInventory[]
+  xpLogs           XpLog[]
+  notifications    Notification[]
+  matchInitiated   SkillMatch[] @relation("InitiatorMatches")
+  matchReceived    SkillMatch[] @relation("ReceiverMatches")
+
+  @@map("users")
+}
+
+// User Skills
+model UserSkill {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  skillName    String   @map("skill_name")
+  skillType    String   @map("skill_type") // "teach" or "learn"
+  proficiency  Int      @default(1) // 1-5
+  description  String?
+  availability Json?    // Store availability as JSON
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillName, skillType])
+  @@map("user_skills")
+}
+
+// Session Model
+model Session {
+  id              String   @id @default(uuid())
+  teacherId       String   @map("teacher_id")
+  learnerId       String   @map("learner_id")
+  skillName       String   @map("skill_name")
+  status          String   @default("pending") // pending, confirmed, completed, cancelled
+  scheduledAt     DateTime @map("scheduled_at")
+  duration        Int      @default(60) // minutes
+  meetingLink     String?
+  teacherRating   Int?     @map("teacher_rating")
+  learnerFeedback String?  @map("learner_feedback")
+  teacherCoins    Int      @default(25) @map("teacher_coins")
+  learnerCoins    Int      @default(15) @map("learner_coins")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  teacher  User          @relation("TeacherSessions", fields: [teacherId], references: [id])
+  learner  User          @relation("LearnerSessions", fields: [learnerId], references: [id])
+  messages ChatMessage[]
+
+  @@map("sessions")
+}
+
+// Chat Message
+model ChatMessage {
+  id           String   @id @default(uuid())
+  sessionId    String   @map("session_id")
+  senderId     String   @map("sender_id")
+  content      String
+  messageType  String   @default("text") @map("message_type") // text, file, emoji
+  isRead       Boolean  @default(false) @map("is_read")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sender  User    @relation("SenderMessages", fields: [senderId], references: [id])
+
+  @@map("chat_messages")
+}
+
+// Skill Match
+model SkillMatch {
+  id              String    @id @default(uuid())
+  user1Id         String    @map("user1_id")
+  user2Id         String    @map("user2_id")
+  teacherSkillId  String    @map("teacher_skill_id")
+  learnerSkillId  String    @map("learner_skill_id")
+  matchScore      Float     @map("match_score")
+  status          String    @default("pending") // pending, accepted, declined
+  matchedAt       DateTime  @default(now()) @map("matched_at")
+  respondedAt     DateTime? @map("responded_at")
+
+  // Relations
+  user1 User @relation("InitiatorMatches", fields: [user1Id], references: [id])
+  user2 User @relation("ReceiverMatches", fields: [user2Id], references: [id])
+
+  @@map("skill_matches")
+}
+
+// Achievement
+model Achievement {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  description   String
+  icon          String
+  xpReward      Int      @map("xp_reward")
+  coinReward    Int      @map("coin_reward")
+  criteria      Json     // Store criteria as JSON
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  users UserAchievement[]
+
+  @@map("achievements")
+}
+
+// User Achievement
+model UserAchievement {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  achievementId String  @map("achievement_id")
+  unlockedAt   DateTime @default(now()) @map("unlocked_at")
+
+  // Relations
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@map("user_achievements")
+}
+
+// Shop Item
+model ShopItem {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  price       Int
+  type        String   // avatar, theme, badge, boost
+  icon        String
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  inventory UserInventory[]
+
+  @@map("shop_items")
+}
+
+// User Inventory
+model UserInventory {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  itemId     String   @map("item_id")
+  purchasedAt DateTime @default(now()) @map("purchased_at")
+
+  // Relations
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item ShopItem  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId])
+  @@map("user_inventory")
+}
+
+// XP Log
+model XpLog {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  xpAmount    Int      @map("xp_amount")
+  source      String   // session_complete, game_win, achievement, login, etc.
+  referenceId String?  @map("reference_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("xp_logs")
+}
+
+// Notification
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String   // match, session, achievement, message
+  title     String
+  message   String
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// Spin Record (to track daily spins)
+model SpinRecord {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  wonItem   String   @map("won_item")
+  wonAmount Int      @map("won_amount")
+  spunAt    DateTime @default(now()) @map("spun_at")
+
+  @@unique([userId, spunAt])
+  @@map("spin_records")
+}
