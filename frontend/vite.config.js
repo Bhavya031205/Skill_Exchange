@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    'import.meta.env.PROD': JSON.stringify(process.env.NODE_ENV === 'production')
+  },
   server: {
     port: 5173,
     proxy: {

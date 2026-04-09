@@ -20,7 +20,19 @@ export const SocketProvider = ({ children }) => {
     if (user) {
       const token = localStorage.getItem('accessToken');
       
-      const newSocket = io(import.meta.env.VITE_API_URL || 'http://localhost:3001', {
+      // Get WebSocket URL based on environment
+      const getSocketUrl = () => {
+        if (import.meta.env.VITE_API_URL) {
+          return import.meta.env.VITE_API_URL;
+        }
+        // Production - use relative WebSocket
+        if (import.meta.env.PROD || window.location.hostname !== 'localhost') {
+          return window.location.origin;
+        }
+        return 'http://localhost:3001';
+      };
+      
+      const newSocket = io(getSocketUrl(), {
         auth: { token },
         transports: ['websocket', 'polling']
       });
