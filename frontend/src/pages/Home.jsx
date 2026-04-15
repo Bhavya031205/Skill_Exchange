@@ -263,9 +263,56 @@ const Home = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-gray-800 py-8">
-        <div className="container mx-auto px-6 text-center text-gray-500">
-          <p>Built for students, by students. 100% Free Forever.</p>
+      <footer className="border-t border-gray-800 py-12 bg-gray-900">
+        <div className="container mx-auto px-6">
+          <div className="grid md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center">
+                  <span className="text-xl">⚡</span>
+                </div>
+                <span className="text-xl font-bold text-gradient">SkillSwap</span>
+              </div>
+              <p className="text-gray-400 text-sm">
+                The gamified peer-to-peer skill exchange platform for students. Learn, teach, and grow together.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4 text-white">Platform</h4>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><Link to="/explore" className="hover:text-primary-400">Explore Skills</Link></li>
+                <li><Link to="/leaderboard" className="hover:text-primary-400">Leaderboard</Link></li>
+                <li><Link to="/games" className="hover:text-primary-400">Mini Games</Link></li>
+                <li><Link to="/shop" className="hover:text-primary-400">Rewards Shop</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4 text-white">Company</h4>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><a href="#" className="hover:text-primary-400">About Us</a></li>
+                <li><a href="#" className="hover:text-primary-400">Contact</a></li>
+                <li><a href="#" className="hover:text-primary-400">Privacy Policy</a></li>
+                <li><a href="#" className="hover:text-primary-400">Terms of Service</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4 text-white">Connect</h4>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><a href="#" className="hover:text-primary-400">Twitter</a></li>
+                <li><a href="#" className="hover:text-primary-400">Discord</a></li>
+                <li><a href="#" className="hover:text-primary-400">GitHub</a></li>
+                <li><a href="#" className="hover:text-primary-400">Instagram</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-gray-500 text-sm">
+              © 2024 SkillSwap. All rights reserved.
+            </p>
+            <div className="flex items-center gap-4">
+              <span className="text-gray-500 text-sm">Made with care for students everywhere</span>
+            </div>
+          </div>
         </div>
       </footer>
     </div>

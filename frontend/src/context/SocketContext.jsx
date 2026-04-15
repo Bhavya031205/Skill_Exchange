@@ -20,12 +20,13 @@ export const SocketProvider = ({ children }) => {
     if (user) {
       const token = localStorage.getItem('accessToken');
       
-      // Get WebSocket URL based on environment
       const getSocketUrl = () => {
-        if (import.meta.env.VITE_API_URL) {
-          return import.meta.env.VITE_API_URL;
+        if (import.meta.env.VITE_SOCKET_URL) {
+          return import.meta.env.VITE_SOCKET_URL;
         }
-        // Production - use relative WebSocket
+        if (import.meta.env.VITE_API_URL) {
+          return import.meta.env.VITE_API_URL.replace('/api', '');
+        }
         if (import.meta.env.PROD || window.location.hostname !== 'localhost') {
           return window.location.origin;
         }
