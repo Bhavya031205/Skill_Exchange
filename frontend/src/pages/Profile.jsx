@@ -1,738 +1,597 @@
-import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  User, Edit2, Star, Trophy, Flame, Calendar, Plus, X, 
-  BookOpen, GraduationCap, Gamepad2, Award, Settings, 
-  Mail, MessageCircle, Clock, ChevronRight, Save, Trash2
+import {
+  User, Edit2, Star, Trophy, Flame, Calendar,
+  Plus, Trash2, Save, X, BookOpen, Gamepad2,
+  TrendingUp, Award, Clock, Check, ChevronDown,
+  ExternalLink, Share2, Copy, CheckCheck
 } from 'lucide-react';
-import { authApi, skillsApi, sessionsApi, gamesApi } from '../services/api';
+import { authApi, skillsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-
+ 
+const levelNames = [
+  'Newcomer', 'Beginner', 'Apprentice', 'Learner',
+  'Skilled', 'Proficient', 'Expert', 'Master', 'Grandmaster', 'Legend'
+];
+ 
+const SKILL_CATEGORIES = [
+  'Programming', 'Design', 'Music', 'Language', 'Math', 'Science',
+  'Art', 'Writing', 'Business', 'Fitness', 'Cooking', 'Photography', 'Other'
+];
+ 
 const Profile = () => {
   const { id } = useParams();
-  const { user: currentUser, fetchUser, updateUser } = useAuth();
+  const location = useLocation();
+  const { user: currentUser, fetchUser } = useAuth();
   const [profile, setProfile] = useState(null);
-  const [skills, setSkills] = useState({ teach: [], learn: [] });
-  const [sessions, setSessions] = useState({ taught: [], learned: [] });
+  const [skills, setSkills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [showAddSkill, setShowAddSkill] = useState(false);
-  const [showEditProfile, setShowEditProfile] = useState(false);
-  const [newSkill, setNewSkill] = useState({ skillName: '', skillType: 'teach', proficiency: 3, description: '' });
-  const [editProfile, setEditProfile] = useState({ username: '', bio: '' });
-  const [gameStats, setGameStats] = useState(null);
-
+  const [editingBio, setEditingBio] = useState(false);
+  const [bio, setBio] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [newSkill, setNewSkill] = useState({
+    skillName: '', skillType: 'teach', proficiency: 3, description: '', category: 'Other'
+  });
+ 
   const isOwn = !id || id === currentUser?.id;
-
+ 
+  useEffect(() => {
+    const hash = location.hash;
+    if (hash === '#skills') setActiveTab('skills');
+    if (hash === '#achievements') setActiveTab('achievements');
+  }, [location]);
+ 
   useEffect(() => {
     loadProfile();
-    if (isOwn) {
-      loadSkills();
-      loadSessions();
-      loadGameStats();
-    }
+    if (isOwn) loadSkills();
   }, [id]);
-
+ 
   const loadProfile = async () => {
     try {
-      const response = isOwn 
-        ? await authApi.getMe()
-        : await authApi.getUser(id);
-      setProfile(response.data.data);
-      setEditProfile({
-        username: response.data.data.username || '',
-        bio: response.data.data.bio || ''
-      });
-    } catch (error) {
+      const res = isOwn ? await authApi.getMe() : await authApi.getUser(id);
+      setProfile(res.data.data);
+      setBio(res.data.data?.bio || '');
+    } catch {
       toast.error('Failed to load profile');
     } finally {
       setLoading(false);
     }
   };
-
+ 
   const loadSkills = async () => {
     try {
-      const response = await skillsApi.getMy();
-      const allSkills = response.data.data;
-      setSkills({
-        teach: allSkills.filter(s => s.skillType === 'teach'),
-        learn: allSkills.filter(s => s.skillType === 'learn')
-      });
-    } catch (error) {
-      console.error('Failed to load skills');
+      const res = await skillsApi.getMy();
+      setSkills(res.data.data);
+    } catch {
+      console.error('Skills load failed');
     }
   };
-
-  const loadSessions = async () => {
-    try {
-      const response = await sessionsApi.getAll({ status: 'completed' });
-      const allSessions = response.data.data;
-      const userId = currentUser?.id;
-      setSessions({
-        taught: allSessions.filter(s => s.teacherId === userId),
-        learned: allSessions.filter(s => s.learnerId === userId)
-      });
-    } catch (error) {
-      console.error('Failed to load sessions');
-    }
-  };
-
-  const loadGameStats = async () => {
-    try {
-      const response = await gamesApi.getStats();
-      setGameStats(response.data.data);
-    } catch (error) {
-      console.error('Failed to load game stats');
-    }
-  };
-
+ 
   const handleAddSkill = async (e) => {
     e.preventDefault();
+    if (!newSkill.skillName.trim()) return;
     try {
-      await skillsApi.add(newSkill);
+      await skillsApi.add({
+        skillName: newSkill.skillName,
+        skillType: newSkill.skillType,
+        proficiency: newSkill.proficiency,
+        description: newSkill.description
+      });
       toast.success('Skill added!');
       loadSkills();
       setShowAddSkill(false);
-      setNewSkill({ skillName: '', skillType: 'teach', proficiency: 3, description: '' });
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to add skill');
+      setNewSkill({ skillName: '', skillType: 'teach', proficiency: 3, description: '', category: 'Other' });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to add skill');
     }
   };
-
+ 
   const handleDeleteSkill = async (skillId) => {
     try {
       await skillsApi.delete(skillId);
       toast.success('Skill removed');
       loadSkills();
-    } catch (error) {
-      toast.error('Failed to delete skill');
+    } catch {
+      toast.error('Failed to remove skill');
     }
   };
-
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault();
-    toast.success('Profile updated!');
-    setShowEditProfile(false);
+ 
+  const handleCopyProfile = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    toast.success('Profile link copied!');
+    setTimeout(() => setCopied(false), 2000);
   };
-
-  const getLevelName = (level) => {
-    const names = ['Newcomer', 'Beginner', 'Apprentice', 'Learner', 'Skilled', 'Proficient', 'Expert', 'Master', 'Grandmaster', 'Legend'];
-    return names[Math.min((level || 1) - 1, 9)];
-  };
-
-  const getLevelColor = (level) => {
-    if (level >= 8) return 'from-gold-400 to-gold-600';
-    if (level >= 5) return 'from-secondary-400 to-secondary-600';
-    if (level >= 3) return 'from-primary-400 to-primary-600';
-    return 'from-gray-400 to-gray-600';
-  };
-
-  const tabs = [
-    { id: 'overview', label: 'Overview', icon: User },
-    { id: 'skills', label: 'My Skills', icon: BookOpen },
-    { id: 'sessions', label: 'Sessions', icon: Calendar },
-    { id: 'games', label: 'Games & Stats', icon: Gamepad2 },
-    ...(isOwn ? [{ id: 'settings', label: 'Settings', icon: Settings }] : [])
+ 
+  const teachSkills = skills.filter(s => s.skillType === 'teach');
+  const learnSkills = skills.filter(s => s.skillType === 'learn');
+  const level = profile?.level || 1;
+ 
+  const achievements = [
+    { name: 'First Steps', icon: '🎯', desc: 'Complete your first session', earned: (profile?._count?.taughtSessions || 0) >= 1 },
+    { name: 'Quick Learner', icon: '📚', desc: 'Complete 5 sessions', earned: (profile?._count?.learnedSessions || 0) >= 5 },
+    { name: 'Skill Master', icon: '🏆', desc: 'Complete 25 sessions', earned: false },
+    { name: 'Speed Demon', icon: '⚡', desc: 'Win 10 Speed Match games', earned: false },
+    { name: 'Streak Starter', icon: '🔥', desc: '7-day login streak', earned: (profile?.streakDays || 0) >= 7 },
+    { name: 'Legend', icon: '👑', desc: 'Reach Level 10', earned: level >= 10 },
+    { name: 'Helpful Hand', icon: '🤝', desc: 'Teach 10 sessions', earned: (profile?._count?.taughtSessions || 0) >= 10 },
+    { name: 'Rising Star', icon: '⭐', desc: 'Get 5 five-star ratings', earned: (profile?.totalRatings || 0) >= 5 },
   ];
-
+ 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-primary-500" />
+      <div className="flex justify-center items-center h-96">
+        <div className="w-10 h-10 border-2 border-sky-500/30 border-t-sky-500 rounded-full animate-spin" />
       </div>
     );
   }
-
+ 
   return (
-    <div className="space-y-6">
-      {/* Profile Header */}
+    <div className="space-y-6 pb-20 lg:pb-6">
+      {/* Profile Header Card */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="card"
+        className="relative overflow-hidden bg-gray-900 border border-white/5 rounded-2xl"
       >
-        <div className="flex flex-col md:flex-row items-center gap-6">
-          <div className="relative">
-            <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center text-5xl font-bold overflow-hidden">
+        {/* Cover */}
+        <div className="h-32 bg-gradient-to-r from-sky-500/30 via-violet-500/20 to-sky-500/10" />
+ 
+        <div className="px-6 pb-6">
+          {/* Avatar + Actions Row */}
+          <div className="flex items-end justify-between -mt-10 mb-4">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-sky-500 to-violet-600 flex items-center justify-center text-3xl font-bold text-white border-4 border-gray-900 shadow-xl">
               {profile?.avatarUrl ? (
-                <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover" />
+                <img src={profile.avatarUrl} alt="" className="w-full h-full rounded-2xl object-cover" />
               ) : (
                 profile?.username?.[0]?.toUpperCase()
               )}
             </div>
-            {isOwn && (
-              <button 
-                onClick={() => setShowEditProfile(true)}
-                className="absolute bottom-0 right-0 w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center border-2 border-gray-700 hover:border-primary-500 transition-colors"
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCopyProfile}
+                className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 border border-white/5 rounded-xl text-sm text-gray-400 hover:text-white hover:border-white/10 transition-colors"
               >
-                <Edit2 className="w-4 h-4 text-gray-400" />
+                {copied ? <CheckCheck className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                {copied ? 'Copied!' : 'Share Profile'}
               </button>
+              {isOwn && (
+                <Link
+                  to="/settings"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-sky-500 hover:bg-sky-600 rounded-xl text-sm text-white font-medium transition-colors"
+                >
+                  <Edit2 className="w-4 h-4" /> Edit Profile
+                </Link>
+              )}
+            </div>
+          </div>
+ 
+          {/* Name + Bio */}
+          <div className="mb-4">
+            <div className="flex items-center gap-3 mb-1">
+              <h1 className="text-2xl font-bold text-white">{profile?.username}</h1>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                Lv. {level}
+              </span>
+            </div>
+ 
+            {/* Bio */}
+            {editingBio && isOwn ? (
+              <div className="flex gap-2 mt-2">
+                <textarea
+                  value={bio}
+                  onChange={e => setBio(e.target.value)}
+                  rows={2}
+                  placeholder="Tell others about yourself..."
+                  className="flex-1 bg-gray-800 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-sky-500/50 resize-none"
+                />
+                <div className="flex flex-col gap-1">
+                  <button onClick={() => { setEditingBio(false); toast.success('Bio saved!'); }} className="p-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30">
+                    <Check className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setEditingBio(false)} className="p-2 bg-gray-700 text-gray-400 rounded-lg hover:bg-gray-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p
+                className={`text-gray-400 text-sm mt-1 ${isOwn ? 'cursor-pointer hover:text-gray-300 group' : ''}`}
+                onClick={() => isOwn && setEditingBio(true)}
+              >
+                {profile?.bio || (isOwn ? 'Click to add a bio...' : 'No bio')}
+                {isOwn && <Edit2 className="w-3 h-3 inline ml-1 opacity-0 group-hover:opacity-50 transition-opacity" />}
+              </p>
             )}
           </div>
-          
-          <div className="flex-1 text-center md:text-left">
-            <h1 className="text-3xl font-bold">{profile?.username}</h1>
-            <p className="text-gray-400 mt-1">{profile?.bio || 'No bio yet. Add one in settings!'}</p>
-            
-            <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-4">
-              <div className="flex items-center gap-2 px-3 py-1 bg-primary-500/20 rounded-full">
-                <span className={`w-6 h-6 rounded-full bg-gradient-to-br ${getLevelColor(profile?.level)} flex items-center justify-center text-xs font-bold`}>
-                  {profile?.level || 1}
-                </span>
-                <span className="text-primary-400 font-medium">{getLevelName(profile?.level)}</span>
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1 bg-gold-400/20 rounded-full">
-                <Star className="w-4 h-4 text-gold-400" />
-                <span className="text-gold-400 font-medium">{profile?.rating?.toFixed(1) || 'New'}</span>
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1 bg-orange-500/20 rounded-full">
-                <Flame className="w-4 h-4 text-orange-500" />
-                <span className="text-orange-500 font-medium">{profile?.streakDays || 0} day streak</span>
-              </div>
+ 
+          {/* Stats Row */}
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-1.5">
+              <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+              <span className="text-sm font-semibold text-white">{profile?.rating?.toFixed(1) || '—'}</span>
+              <span className="text-xs text-gray-500">Rating</span>
             </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-primary-400">{profile?.xp || 0}</p>
-              <p className="text-xs text-gray-400">Total XP</p>
+            <div className="flex items-center gap-1.5">
+              <Flame className="w-4 h-4 text-orange-500" />
+              <span className="text-sm font-semibold text-white">{profile?.streakDays || 0}</span>
+              <span className="text-xs text-gray-500">Day streak</span>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gold-400">{profile?.coins || 0}</p>
-              <p className="text-xs text-gray-400">Coins</p>
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-4 h-4 text-sky-400" />
+              <span className="text-sm font-semibold text-white">
+                {(profile?._count?.taughtSessions || 0) + (profile?._count?.learnedSessions || 0)}
+              </span>
+              <span className="text-xs text-gray-500">Sessions</span>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-secondary-400">{profile?._count?.achievements || 0}</p>
-              <p className="text-xs text-gray-400">Badges</p>
+            <div className="flex items-center gap-1.5">
+              <TrendingUp className="w-4 h-4 text-green-400" />
+              <span className="text-sm font-semibold text-white">{(profile?.xp || 0).toLocaleString()}</span>
+              <span className="text-xs text-gray-500">XP</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Trophy className="w-4 h-4 text-violet-400" />
+              <span className="text-sm font-semibold text-white">{achievements.filter(a => a.earned).length}</span>
+              <span className="text-xs text-gray-500">Badges</span>
             </div>
           </div>
         </div>
+ 
+        {/* Tabs */}
+        <div className="border-t border-white/5 flex overflow-x-auto">
+          {[
+            { id: 'overview', label: 'Overview' },
+            { id: 'skills', label: 'Skills', count: skills.length },
+            { id: 'achievements', label: 'Achievements', count: achievements.filter(a => a.earned).length },
+            { id: 'activity', label: 'Activity' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-6 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+                activeTab === tab.id
+                  ? 'border-sky-500 text-sky-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {tab.label}
+              {tab.count !== undefined && (
+                <span className={`px-1.5 py-0.5 rounded-full text-xs ${activeTab === tab.id ? 'bg-sky-500/20 text-sky-400' : 'bg-gray-700 text-gray-400'}`}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </motion.div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all whitespace-nowrap ${
-              activeTab === tab.id
-                ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <tab.icon className="w-4 h-4" />
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
+ 
       {/* Tab Content */}
       <AnimatePresence mode="wait">
         {activeTab === 'overview' && (
           <motion.div
             key="overview"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="space-y-6"
+            exit={{ opacity: 0 }}
+            className="grid md:grid-cols-2 gap-4"
           >
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="card text-center">
-                <GraduationCap className="w-8 h-8 text-primary-400 mx-auto mb-2" />
-                <p className="text-2xl font-bold">{sessions.taught.length}</p>
-                <p className="text-sm text-gray-400">Skills Shared</p>
-              </div>
-              <div className="card text-center">
-                <BookOpen className="w-8 h-8 text-secondary-400 mx-auto mb-2" />
-                <p className="text-2xl font-bold">{sessions.learned.length}</p>
-                <p className="text-sm text-gray-400">Skills Learned</p>
-              </div>
-              <div className="card text-center">
-                <Calendar className="w-8 h-8 text-gold-400 mx-auto mb-2" />
-                <p className="text-2xl font-bold">{sessions.taught.length + sessions.learned.length}</p>
-                <p className="text-sm text-gray-400">Total Sessions</p>
-              </div>
-              <div className="card text-center">
-                <Award className="w-8 h-8 text-orange-400 mx-auto mb-2" />
-                <p className="text-2xl font-bold">{profile?._count?.achievements || 0}</p>
-                <p className="text-sm text-gray-400">Achievements</p>
-              </div>
-            </div>
-
-            {/* Skills Preview */}
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="card">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <BookOpen className="w-5 h-5 text-primary-400" />
-                    Can Teach ({skills.teach.length})
-                  </h3>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {skills.teach.length > 0 ? skills.teach.slice(0, 5).map((skill) => (
-                    <span key={skill.id} className="px-3 py-1 bg-primary-500/20 text-primary-300 rounded-full text-sm">
-                      {skill.skillName}
-                    </span>
-                  )) : (
-                    <p className="text-gray-500 text-sm">No skills to teach yet</p>
-                  )}
+            {/* Stats Cards */}
+            {[
+              { label: 'Sessions Taught', value: profile?._count?.taughtSessions || 0, icon: '📚', color: 'sky' },
+              { label: 'Sessions Learned', value: profile?._count?.learnedSessions || 0, icon: '🎯', color: 'violet' },
+              { label: 'Total XP Earned', value: (profile?.xp || 0).toLocaleString(), icon: '⚡', color: 'yellow' },
+              { label: 'Skills Listed', value: skills.length, icon: '💡', color: 'green' },
+            ].map((s) => (
+              <div key={s.label} className="bg-gray-900 border border-white/5 rounded-2xl p-5">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">{s.icon}</span>
+                  <div>
+                    <p className="text-2xl font-bold text-white">{s.value}</p>
+                    <p className="text-sm text-gray-500">{s.label}</p>
+                  </div>
                 </div>
               </div>
-              <div className="card">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <GraduationCap className="w-5 h-5 text-secondary-400" />
-                    Want to Learn ({skills.learn.length})
-                  </h3>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {skills.learn.length > 0 ? skills.learn.slice(0, 5).map((skill) => (
-                    <span key={skill.id} className="px-3 py-1 bg-secondary-500/20 text-secondary-300 rounded-full text-sm">
-                      {skill.skillName}
-                    </span>
-                  )) : (
-                    <p className="text-gray-500 text-sm">No skills to learn yet</p>
-                  )}
-                </div>
+            ))}
+ 
+            {/* Skill Summary */}
+            <div className="md:col-span-2 bg-gray-900 border border-white/5 rounded-2xl p-5">
+              <h3 className="font-semibold text-white mb-3">Top Skills</h3>
+              <div className="flex flex-wrap gap-2">
+                {skills.slice(0, 8).map((skill) => (
+                  <span
+                    key={skill.id}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border ${
+                      skill.skillType === 'teach'
+                        ? 'bg-sky-500/10 text-sky-400 border-sky-500/20'
+                        : 'bg-violet-500/10 text-violet-400 border-violet-500/20'
+                    }`}
+                  >
+                    {skill.skillType === 'teach' ? '📚' : '🎯'} {skill.skillName}
+                  </span>
+                ))}
+                {skills.length === 0 && (
+                  <p className="text-gray-500 text-sm">No skills added yet</p>
+                )}
               </div>
             </div>
           </motion.div>
         )}
-
+ 
         {activeTab === 'skills' && (
           <motion.div
             key="skills"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
+            exit={{ opacity: 0 }}
             className="space-y-6"
           >
-            {/* Can Teach Section */}
-            <div className="card">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <BookOpen className="w-5 h-5 text-primary-400" />
-                  Skills I Can Teach
-                </h3>
-                {isOwn && (
-                  <button
-                    onClick={() => { setNewSkill({ ...newSkill, skillType: 'teach' }); setShowAddSkill(true); }}
-                    className="btn-primary text-sm py-2"
-                  >
-                    <Plus className="w-4 h-4 mr-1" /> Add Skill
-                  </button>
-                )}
+            {isOwn && (
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowAddSkill(!showAddSkill)}
+                  className="flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-sm font-medium transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Add Skill
+                </button>
               </div>
-              <div className="space-y-3">
-                {skills.teach.length > 0 ? skills.teach.map((skill) => (
-                  <div key={skill.id} className="flex items-center gap-4 p-4 bg-gray-700/50 rounded-xl">
-                    <div className="w-12 h-12 rounded-xl bg-primary-500/20 flex items-center justify-center text-2xl">
-                      📚
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-lg">{skill.skillName}</p>
-                      <p className="text-sm text-gray-400">{skill.description || 'No description'}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs text-gray-500">Proficiency:</span>
-                        <div className="flex gap-1">
-                          {[...Array(5)].map((_, i) => (
-                            <div key={i} className={`w-3 h-3 rounded-full ${i < (skill.proficiency || 1) ? 'bg-primary-400' : 'bg-gray-600'}`} />
-                          ))}
+            )}
+ 
+            <AnimatePresence>
+              {showAddSkill && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <form onSubmit={handleAddSkill} className="bg-gray-900 border border-sky-500/30 rounded-2xl p-5 space-y-4">
+                    <h3 className="font-semibold text-white">Add a Skill</h3>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1.5 font-medium">Skill Name *</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. React.js, Guitar, Spanish..."
+                          value={newSkill.skillName}
+                          onChange={e => setNewSkill({ ...newSkill, skillName: e.target.value })}
+                          className="w-full bg-gray-800 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-sky-500/50"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1.5 font-medium">Type *</label>
+                        <select
+                          value={newSkill.skillType}
+                          onChange={e => setNewSkill({ ...newSkill, skillType: e.target.value })}
+                          className="w-full bg-gray-800 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500/50"
+                        >
+                          <option value="teach">I can teach this</option>
+                          <option value="learn">I want to learn this</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1.5 font-medium">Proficiency: {newSkill.proficiency}/5</label>
+                        <input
+                          type="range"
+                          min={1}
+                          max={5}
+                          value={newSkill.proficiency}
+                          onChange={e => setNewSkill({ ...newSkill, proficiency: parseInt(e.target.value) })}
+                          className="w-full accent-sky-500"
+                        />
+                        <div className="flex justify-between text-xs text-gray-600 mt-0.5">
+                          <span>Beginner</span><span>Expert</span>
                         </div>
                       </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1.5 font-medium">Short Description (optional)</label>
+                        <input
+                          type="text"
+                          placeholder="What can you teach / what do you want to learn?"
+                          value={newSkill.description}
+                          onChange={e => setNewSkill({ ...newSkill, description: e.target.value })}
+                          className="w-full bg-gray-800 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-sky-500/50"
+                        />
+                      </div>
                     </div>
-                    {isOwn && (
-                      <button
-                        onClick={() => handleDeleteSkill(skill.id)}
-                        className="p-2 text-gray-400 hover:text-red-400 transition-colors"
-                      >
-                        <Trash2 className="w-5 h-5" />
+                    <div className="flex gap-2 justify-end">
+                      <button type="button" onClick={() => setShowAddSkill(false)} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">
+                        Cancel
                       </button>
-                    )}
-                  </div>
-                )) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No skills to teach yet</p>
-                    <p className="text-sm">Add skills you're good at!</p>
-                  </div>
-                )}
-              </div>
+                      <button type="submit" className="px-5 py-2 bg-sky-500 hover:bg-sky-600 text-white text-sm font-medium rounded-xl transition-colors">
+                        Add Skill
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
+ 
+            {/* Teach Skills */}
+            <div>
+              <h3 className="font-semibold text-sky-400 mb-3 flex items-center gap-2">
+                <BookOpen className="w-4 h-4" /> Skills I Can Teach ({teachSkills.length})
+              </h3>
+              {teachSkills.length === 0 ? (
+                <p className="text-gray-600 text-sm bg-gray-900 border border-dashed border-white/10 rounded-xl p-4 text-center">
+                  No teaching skills added yet
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {teachSkills.map((skill) => (
+                    <SkillCard key={skill.id} skill={skill} isOwn={isOwn} onDelete={() => handleDeleteSkill(skill.id)} />
+                  ))}
+                </div>
+              )}
             </div>
-
-            {/* Want to Learn Section */}
-            <div className="card">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <GraduationCap className="w-5 h-5 text-secondary-400" />
-                  Skills I Want to Learn
-                </h3>
-                {isOwn && (
-                  <button
-                    onClick={() => { setNewSkill({ ...newSkill, skillType: 'learn' }); setShowAddSkill(true); }}
-                    className="btn-secondary text-sm py-2"
-                  >
-                    <Plus className="w-4 h-4 mr-1" /> Add Skill
-                  </button>
-                )}
-              </div>
-              <div className="space-y-3">
-                {skills.learn.length > 0 ? skills.learn.map((skill) => (
-                  <div key={skill.id} className="flex items-center gap-4 p-4 bg-gray-700/50 rounded-xl">
-                    <div className="w-12 h-12 rounded-xl bg-secondary-500/20 flex items-center justify-center text-2xl">
-                      🎯
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-lg">{skill.skillName}</p>
-                      <p className="text-sm text-gray-400">{skill.description || 'No description'}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs text-gray-500">Current Level:</span>
-                        <div className="flex gap-1">
-                          {[...Array(5)].map((_, i) => (
-                            <div key={i} className={`w-3 h-3 rounded-full ${i < (skill.proficiency || 1) ? 'bg-secondary-400' : 'bg-gray-600'}`} />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    {isOwn && (
-                      <button
-                        onClick={() => handleDeleteSkill(skill.id)}
-                        className="p-2 text-gray-400 hover:text-red-400 transition-colors"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    )}
-                  </div>
-                )) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <GraduationCap className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No skills to learn yet</p>
-                    <p className="text-sm">Add skills you want to learn!</p>
-                  </div>
-                )}
-              </div>
+ 
+            {/* Learn Skills */}
+            <div>
+              <h3 className="font-semibold text-violet-400 mb-3 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" /> Skills I Want to Learn ({learnSkills.length})
+              </h3>
+              {learnSkills.length === 0 ? (
+                <p className="text-gray-600 text-sm bg-gray-900 border border-dashed border-white/10 rounded-xl p-4 text-center">
+                  No learning goals added yet
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {learnSkills.map((skill) => (
+                    <SkillCard key={skill.id} skill={skill} isOwn={isOwn} onDelete={() => handleDeleteSkill(skill.id)} />
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
-
-        {activeTab === 'sessions' && (
+ 
+        {activeTab === 'achievements' && (
           <motion.div
-            key="sessions"
-            initial={{ opacity: 0, y: 20 }}
+            key="achievements"
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="space-y-6"
+            exit={{ opacity: 0 }}
+            className="grid grid-cols-1 sm:grid-cols-2 gap-3"
           >
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Skills Shared (Taught) */}
-              <div className="card">
-                <h3 className="text-xl font-bold flex items-center gap-2 mb-4">
-                  <BookOpen className="w-5 h-5 text-primary-400" />
-                  Skills I've Shared
-                </h3>
-                <div className="space-y-3">
-                  {sessions.taught.length > 0 ? sessions.taught.map((session) => (
-                    <div key={session.id} className="flex items-center gap-3 p-3 bg-gray-700/50 rounded-xl">
-                      <div className="w-10 h-10 rounded-full bg-primary-500/20 flex items-center justify-center">
-                        📚
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium">{session.skillName}</p>
-                        <p className="text-xs text-gray-400">with {session.learner?.username}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-gold-400">+25 🪙</p>
-                        <p className="text-xs text-gray-500">+50 XP</p>
-                      </div>
-                    </div>
-                  )) : (
-                    <p className="text-gray-500 text-center py-4">No sessions taught yet</p>
+            {achievements.map((ach) => (
+              <div
+                key={ach.name}
+                className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${
+                  ach.earned
+                    ? 'bg-gradient-to-r from-yellow-400/10 to-orange-400/10 border-yellow-400/30'
+                    : 'bg-gray-900 border-white/5 opacity-50 grayscale'
+                }`}
+              >
+                <span className="text-3xl">{ach.icon}</span>
+                <div>
+                  <p className="font-semibold text-white text-sm">{ach.name}</p>
+                  <p className="text-xs text-gray-400">{ach.desc}</p>
+                  {ach.earned && (
+                    <span className="inline-flex items-center gap-1 text-xs text-yellow-400 mt-1 font-medium">
+                      <Check className="w-3 h-3" /> Earned
+                    </span>
                   )}
                 </div>
               </div>
-
-              {/* Skills Learned */}
-              <div className="card">
-                <h3 className="text-xl font-bold flex items-center gap-2 mb-4">
-                  <GraduationCap className="w-5 h-5 text-secondary-400" />
-                  Skills I've Learned
-                </h3>
-                <div className="space-y-3">
-                  {sessions.learned.length > 0 ? sessions.learned.map((session) => (
-                    <div key={session.id} className="flex items-center gap-3 p-3 bg-gray-700/50 rounded-xl">
-                      <div className="w-10 h-10 rounded-full bg-secondary-500/20 flex items-center justify-center">
-                        🎓
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium">{session.skillName}</p>
-                        <p className="text-xs text-gray-400">from {session.teacher?.username}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-gold-400">+15 🪙</p>
-                        <p className="text-xs text-gray-500">+30 XP</p>
-                      </div>
-                    </div>
-                  )) : (
-                    <p className="text-gray-500 text-center py-4">No sessions learned yet</p>
-                  )}
-                </div>
-              </div>
-            </div>
+            ))}
           </motion.div>
         )}
-
-        {activeTab === 'games' && (
+ 
+        {activeTab === 'activity' && (
           <motion.div
-            key="games"
-            initial={{ opacity: 0, y: 20 }}
+            key="activity"
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="space-y-6"
+            exit={{ opacity: 0 }}
+            className="space-y-4"
           >
-            {/* Game Stats */}
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="card text-center">
-                <Gamepad2 className="w-10 h-10 text-secondary-400 mx-auto mb-2" />
-                <p className="text-3xl font-bold">{gameStats?.sessionsCompleted || 0}</p>
-                <p className="text-gray-400">Games Played</p>
-              </div>
-              <div className="card text-center">
-                <Trophy className="w-10 h-10 text-gold-400 mx-auto mb-2" />
-                <p className="text-3xl font-bold">{gameStats?.achievements || 0}</p>
-                <p className="text-gray-400">Achievements</p>
-              </div>
-              <div className="card text-center">
-                <Flame className="w-10 h-10 text-orange-400 mx-auto mb-2" />
-                <p className="text-3xl font-bold">{gameStats?.streakDays || 0}</p>
-                <p className="text-gray-400">Day Streak</p>
-              </div>
-            </div>
-
-            {/* Level Progress */}
-            <div className="card">
-              <h3 className="text-xl font-bold mb-4">Level Progress</h3>
-              <div className="flex items-center gap-4">
-                <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${getLevelColor(profile?.level)} flex items-center justify-center text-2xl font-bold`}>
-                  {profile?.level || 1}
-                </div>
-                <div className="flex-1">
-                  <div className="flex justify-between mb-2">
-                    <span className="font-medium">{getLevelName(profile?.level)}</span>
-                    <span className="text-gray-400">{profile?.xp || 0} / {gameStats?.nextLevelXp || 100} XP</span>
-                  </div>
-                  <div className="xp-bar h-4">
-                    <div className="xp-bar-fill" style={{ width: `${gameStats?.levelProgress || 0}%` }} />
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">{gameStats?.xpToNextLevel || 0} XP to next level</p>
-                </div>
-              </div>
-            </div>
-
-            {/* XP Sources */}
-            <div className="card">
-              <h3 className="text-xl font-bold mb-4">XP Sources</h3>
-              <div className="space-y-3">
-                {gameStats?.xpSources?.length > 0 ? gameStats.xpSources.map((source, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-700/50 rounded-xl">
-                    <span className="capitalize text-gray-300">{source.source.replace(/_/g, ' ')}</span>
-                    <div className="text-right">
-                      <p className="font-bold text-primary-400">+{source.totalXp} XP</p>
-                      <p className="text-xs text-gray-500">{source.count} times</p>
+            <div className="bg-gray-900 border border-white/5 rounded-2xl p-5">
+              <h3 className="font-semibold text-white mb-4">Recent Activity</h3>
+              <div className="space-y-4">
+                {[
+                  { icon: '🎯', text: 'Played Speed Match game', time: '2h ago', points: '+15 XP' },
+                  { icon: '🎡', text: 'Spun the daily wheel', time: '1d ago', points: '+20 coins' },
+                  { icon: '📚', text: 'Added skill: React.js (Teaching)', time: '2d ago', points: '' },
+                  { icon: '🔥', text: 'Reached 3-day login streak', time: '3d ago', points: '+10 XP' },
+                  { icon: '👋', text: 'Joined SkillSwap', time: 'Recently', points: '+100 coins' },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center text-lg shrink-0">
+                      {item.icon}
                     </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-300">{item.text}</p>
+                      <p className="text-xs text-gray-600">{item.time}</p>
+                    </div>
+                    {item.points && (
+                      <span className="text-xs font-semibold text-green-400 shrink-0">{item.points}</span>
+                    )}
                   </div>
-                )) : (
-                  <p className="text-gray-500 text-center py-4">No XP earned yet. Complete sessions and play games!</p>
-                )}
+                ))}
               </div>
             </div>
-          </motion.div>
-        )}
-
-        {activeTab === 'settings' && isOwn && (
-          <motion.div
-            key="settings"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="space-y-6"
-          >
-            {/* Edit Profile */}
-            <div className="card">
-              <h3 className="text-xl font-bold mb-4">Profile Settings</h3>
-              <form onSubmit={handleUpdateProfile} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Username</label>
-                  <input
-                    type="text"
-                    value={editProfile.username}
-                    onChange={(e) => setEditProfile({ ...editProfile, username: e.target.value })}
-                    className="input-field"
-                  />
+ 
+            {/* Games played */}
+            <div className="bg-gray-900 border border-white/5 rounded-2xl p-5">
+              <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                <Gamepad2 className="w-5 h-5 text-violet-400" /> Games & Activities
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-800 rounded-xl p-3">
+                  <p className="text-xl font-bold text-white">0</p>
+                  <p className="text-xs text-gray-500">Speed Match rounds</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Bio</label>
-                  <textarea
-                    value={editProfile.bio}
-                    onChange={(e) => setEditProfile({ ...editProfile, bio: e.target.value })}
-                    className="input-field h-24"
-                    placeholder="Tell us about yourself..."
-                  />
+                <div className="bg-gray-800 rounded-xl p-3">
+                  <p className="text-xl font-bold text-white">0</p>
+                  <p className="text-xs text-gray-500">Daily spins used</p>
                 </div>
-                <button type="submit" className="btn-primary">
-                  <Save className="w-4 h-4 mr-2" /> Save Changes
-                </button>
-              </form>
-            </div>
-
-            {/* Account Info */}
-            <div className="card">
-              <h3 className="text-xl font-bold mb-4">Account Information</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <Mail className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-400">Email</span>
-                  </div>
-                  <span>{profile?.email}</span>
+                <div className="bg-gray-800 rounded-xl p-3">
+                  <p className="text-xl font-bold text-white">0</p>
+                  <p className="text-xs text-gray-500">Matches won</p>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <Calendar className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-400">Member Since</span>
-                  </div>
-                  <span>{new Date(profile?.createdAt).toLocaleDateString()}</span>
+                <div className="bg-gray-800 rounded-xl p-3">
+                  <p className="text-xl font-bold text-white">{profile?.coins || 0}</p>
+                  <p className="text-xs text-gray-500">Total coins earned</p>
                 </div>
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Add Skill Modal */}
-      <AnimatePresence>
-        {showAddSkill && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="modal-overlay"
-            onClick={() => setShowAddSkill(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="modal-content"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold">
-                  Add {newSkill.skillType === 'teach' ? 'Skill to Teach' : 'Skill to Learn'}
-                </h3>
-                <button onClick={() => setShowAddSkill(false)} className="text-gray-400 hover:text-white">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              <form onSubmit={handleAddSkill} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Skill Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., JavaScript, Guitar, Photoshop"
-                    value={newSkill.skillName}
-                    onChange={(e) => setNewSkill({ ...newSkill, skillName: e.target.value })}
-                    className="input-field"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Proficiency Level</label>
-                  <select
-                    value={newSkill.proficiency}
-                    onChange={(e) => setNewSkill({ ...newSkill, proficiency: parseInt(e.target.value) })}
-                    className="input-field"
-                  >
-                    <option value={1}>1 - Beginner</option>
-                    <option value={2}>2 - Elementary</option>
-                    <option value={3}>3 - Intermediate</option>
-                    <option value={4}>4 - Advanced</option>
-                    <option value={5}>5 - Expert</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Description (Optional)</label>
-                  <textarea
-                    placeholder="Describe your skill level..."
-                    value={newSkill.description}
-                    onChange={(e) => setNewSkill({ ...newSkill, description: e.target.value })}
-                    className="input-field h-20"
-                  />
-                </div>
-                <button type="submit" className="btn-primary w-full">
-                  <Save className="w-4 h-4 mr-2" /> Add Skill
-                </button>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Edit Profile Modal */}
-      <AnimatePresence>
-        {showEditProfile && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="modal-overlay"
-            onClick={() => setShowEditProfile(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="modal-content"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold">Edit Profile</h3>
-                <button onClick={() => setShowEditProfile(false)} className="text-gray-400 hover:text-white">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              <form onSubmit={handleUpdateProfile} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Username</label>
-                  <input
-                    type="text"
-                    value={editProfile.username}
-                    onChange={(e) => setEditProfile({ ...editProfile, username: e.target.value })}
-                    className="input-field"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Bio</label>
-                  <textarea
-                    value={editProfile.bio}
-                    onChange={(e) => setEditProfile({ ...editProfile, bio: e.target.value })}
-                    className="input-field h-24"
-                    placeholder="Tell us about yourself..."
-                  />
-                </div>
-                <button type="submit" className="btn-primary w-full">
-                  <Save className="w-4 h-4 mr-2" /> Save Changes
-                </button>
-              </form>
-            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
     </div>
   );
 };
-
+ 
+const SkillCard = ({ skill, isOwn, onDelete }) => {
+  const proficiencyLabels = ['', 'Beginner', 'Elementary', 'Intermediate', 'Advanced', 'Expert'];
+ 
+  return (
+    <div className="flex items-center gap-4 p-4 bg-gray-900 border border-white/5 rounded-xl hover:border-white/10 transition-colors group">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${
+        skill.skillType === 'teach' ? 'bg-sky-500/15' : 'bg-violet-500/15'
+      }`}>
+        {skill.skillType === 'teach' ? '📚' : '🎯'}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="font-medium text-white text-sm">{skill.skillName}</p>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+            skill.skillType === 'teach'
+              ? 'bg-sky-500/10 text-sky-400'
+              : 'bg-violet-500/10 text-violet-400'
+          }`}>
+            {skill.skillType === 'teach' ? 'Teaching' : 'Learning'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 mt-1.5">
+          <div className="flex gap-0.5">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className={`w-4 h-1.5 rounded-full ${i <= (skill.proficiency || 1) ? 'bg-sky-400' : 'bg-gray-700'}`}
+              />
+            ))}
+          </div>
+          <span className="text-xs text-gray-500">{proficiencyLabels[skill.proficiency || 1]}</span>
+        </div>
+        {skill.description && (
+          <p className="text-xs text-gray-500 mt-1 truncate">{skill.description}</p>
+        )}
+      </div>
+      {isOwn && (
+        <button
+          onClick={onDelete}
+          className="opacity-0 group-hover:opacity-100 p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+};
+ 
 export default Profile;
