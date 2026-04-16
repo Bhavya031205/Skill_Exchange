@@ -1,10 +1,7 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
  
-// Layout
 import Layout from './components/layout/Layout';
- 
-// Pages
 import Home from './pages/Home';
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
@@ -20,32 +17,47 @@ import Settings from './pages/Settings';
  
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-2 border-sky-500/30 border-t-sky-500 rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm">Loading...</p>
+          <div className="relative w-12 h-12">
+            <div className="absolute inset-0 border-2 border-sky-500/20 rounded-full" />
+            <div className="absolute inset-0 border-2 border-transparent border-t-sky-500 rounded-full animate-spin" />
+          </div>
+          <p className="text-gray-600 text-sm tracking-wide">Loading...</p>
         </div>
       </div>
     );
   }
  
   if (!user) {
-    return <Navigate to="/login" replace />;
+    // Pass the attempted location so Login can redirect back after auth
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
  
+  return children;
+};
+ 
+// Redirect logged-in users away from auth pages
+const PublicRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (user) return <Navigate to="/dashboard" replace />;
   return children;
 };
  
 function App() {
   return (
     <Routes>
+      {/* Public */}
       <Route path="/" element={<Home />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
  
+      {/* Protected - inside Layout */}
       <Route element={<Layout />}>
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
@@ -60,6 +72,7 @@ function App() {
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       </Route>
  
+      {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

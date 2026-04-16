@@ -1,322 +1,440 @@
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { 
-  Zap, 
-  Users, 
-  Trophy, 
-  Gamepad2, 
-  Coins, 
-  ArrowRight,
-  Star,
-  Clock,
-  Shield
-} from 'lucide-react';
-
-const features = [
-  {
-    icon: Users,
-    title: 'Find Your Match',
-    description: 'Connect with peers who want to learn what you teach and teach what you want to learn.',
-    color: 'from-primary-400 to-primary-600'
-  },
-  {
-    icon: Gamepad2,
-    title: 'Learn Through Play',
-    description: 'Earn XP, coins, and badges while exchanging skills. Learning has never been this fun!',
-    color: 'from-secondary-400 to-secondary-600'
-  },
-  {
-    icon: Trophy,
-    title: 'Compete & Rank',
-    description: 'Climb the leaderboards and become the top skill exchanger in your community.',
-    color: 'from-gold-400 to-gold-600'
-  }
+import { motion, useInView, useMotionValue, useSpring, AnimatePresence } from 'framer-motion';
+import { Zap, Users, Trophy, Gamepad2, ArrowRight, Star, Coins, Flame, ChevronDown, Sparkles, CheckCircle } from 'lucide-react';
+ 
+// Animated number counter
+const Counter = ({ to, suffix = '', duration = 2 }) => {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true });
+  const [count, setCount] = useState(0);
+ 
+  useEffect(() => {
+    if (!inView) return;
+    let start = 0;
+    const step = to / (duration * 60);
+    const timer = setInterval(() => {
+      start += step;
+      if (start >= to) { setCount(to); clearInterval(timer); }
+      else setCount(Math.floor(start));
+    }, 1000 / 60);
+    return () => clearInterval(timer);
+  }, [inView, to, duration]);
+ 
+  return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
+};
+ 
+// Floating skill pill
+const SkillPill = ({ label, color, delay, x, y }) => (
+  <motion.div
+    className={`absolute px-3 py-1.5 rounded-full text-xs font-semibold border backdrop-blur-sm ${color}`}
+    style={{ left: `${x}%`, top: `${y}%` }}
+    initial={{ opacity: 0, scale: 0.8 }}
+    animate={{ opacity: [0, 1, 1, 0], y: [-10, -20, -30, -40], scale: [0.8, 1, 1, 0.8] }}
+    transition={{ duration: 4, delay, repeat: Infinity, repeatDelay: 3 + Math.random() * 4 }}
+  >
+    {label}
+  </motion.div>
+);
+ 
+const FLOATING_SKILLS = [
+  { label: '⚛️ React', color: 'bg-sky-500/20 border-sky-500/30 text-sky-300', x: 8, y: 30, delay: 0 },
+  { label: '🎸 Guitar', color: 'bg-violet-500/20 border-violet-500/30 text-violet-300', x: 75, y: 20, delay: 1.2 },
+  { label: '🎨 Figma', color: 'bg-pink-500/20 border-pink-500/30 text-pink-300', x: 85, y: 55, delay: 0.6 },
+  { label: '🌍 Spanish', color: 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300', x: 5, y: 65, delay: 1.8 },
+  { label: '📊 Excel', color: 'bg-orange-500/20 border-orange-500/30 text-orange-300', x: 65, y: 75, delay: 2.4 },
+  { label: '🎬 Video', color: 'bg-yellow-500/20 border-yellow-500/30 text-yellow-300', x: 20, y: 80, delay: 0.9 },
 ];
-
-const stats = [
-  { value: '10K+', label: 'Active Learners' },
-  { value: '50K+', label: 'Skills Exchanged' },
-  { value: '4.9★', label: 'Average Rating' },
-  { value: '100%', label: 'Free Forever' }
+ 
+const TESTIMONIALS = [
+  { name: 'Priya S.', role: 'CS Student', text: 'Learned React in 2 weeks teaching math to 3 people. Insane value.', avatar: 'P', xp: 2840 },
+  { name: 'Arjun M.', role: 'Music Grad', text: 'Traded guitar lessons for Python skills. My startup thanks SkillSwap.', avatar: 'A', xp: 4210 },
+  { name: 'Neha K.', role: 'Designer', text: 'Found my UI/UX mentor here. Leveled up faster than any bootcamp.', avatar: 'N', xp: 1920 },
 ];
-
-const Home = () => {
+ 
+export default function Home() {
+  const [testimonialIdx, setTestimonialIdx] = useState(0);
+  const heroRef = useRef(null);
+ 
+  useEffect(() => {
+    const t = setInterval(() => setTestimonialIdx(i => (i + 1) % TESTIMONIALS.length), 4000);
+    return () => clearInterval(t);
+  }, []);
+ 
   return (
-    <div className="min-h-screen bg-gray-900">
-      {/* Hero Section */}
-      <header className="relative overflow-hidden">
-        {/* Animated Background */}
-        <div className="absolute inset-0 bg-hero-pattern opacity-30" />
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary-500/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary-500/20 rounded-full blur-3xl animate-pulse" />
-
-        <nav className="relative z-10 container mx-auto px-6 py-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center">
-              <span className="text-3xl">⚡</span>
+    <div className="min-h-screen bg-gray-950 text-white overflow-x-hidden">
+      {/* ─── NAVBAR ─── */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-950/80 backdrop-blur-lg border-b border-white/5">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-gradient-to-br from-sky-500 to-violet-600 rounded-lg flex items-center justify-center">
+              <Zap className="w-4 h-4 text-white" />
             </div>
-            <span className="text-2xl font-bold text-gradient">SkillSwap</span>
+            <span className="font-bold bg-gradient-to-r from-sky-400 to-violet-400 bg-clip-text text-transparent">
+              SkillSwap
+            </span>
+          </Link>
+          <div className="flex items-center gap-3">
+            <Link to="/login" className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">
+              Sign in
+            </Link>
+            <Link to="/register" className="px-4 py-2 text-sm font-semibold bg-gradient-to-r from-sky-500 to-violet-600 hover:from-sky-400 hover:to-violet-500 text-white rounded-xl transition-all shadow-lg shadow-sky-500/20">
+              Get Started Free
+            </Link>
           </div>
-          <div className="flex items-center gap-4">
-            <Link to="/login" className="btn-ghost">Login</Link>
-            <Link to="/register" className="btn-primary">Get Started Free</Link>
-          </div>
-        </nav>
-
-        <div className="relative z-10 container mx-auto px-6 py-20 text-center">
+        </div>
+      </nav>
+ 
+      {/* ─── HERO ─── */}
+      <section ref={heroRef} className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
+        {/* Grid background */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(14,165,233,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(14,165,233,0.03)_1px,transparent_1px)] bg-[size:64px_64px]" />
+ 
+        {/* Glows */}
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-sky-500/10 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute top-2/3 left-1/3 w-[400px] h-[400px] bg-violet-500/8 rounded-full blur-[100px] pointer-events-none" />
+ 
+        {/* Floating skills */}
+        <div className="absolute inset-0 pointer-events-none hidden lg:block">
+          {FLOATING_SKILLS.map((s, i) => <SkillPill key={i} {...s} />)}
+        </div>
+ 
+        <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <h1 className="text-5xl md:text-7xl font-bold mb-6">
-              <span className="text-gradient">Learn & Teach</span>
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-sky-500/10 border border-sky-500/20 rounded-full text-sky-400 text-xs font-semibold mb-8">
+              <Sparkles className="w-3.5 h-3.5" />
+              Gamified Peer-to-Peer Learning
+            </div>
+ 
+            <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-[1.05] mb-6">
+              <span className="text-white">Teach what</span>
               <br />
-              <span className="text-white">Through Play</span>
+              <span className="bg-gradient-to-r from-sky-400 via-violet-400 to-sky-400 bg-clip-text text-transparent bg-[length:200%] animate-[gradient_3s_ease_infinite]">
+                you know.
+              </span>
+              <br />
+              <span className="text-white">Learn what</span>
+              <br />
+              <span className="bg-gradient-to-r from-violet-400 via-sky-400 to-violet-400 bg-clip-text text-transparent bg-[length:200%] animate-[gradient_3s_ease_infinite_1s]">
+                you love.
+              </span>
             </h1>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10">
-              The gamified skill exchange platform where you teach what you know, 
-              learn what you love, and earn rewards along the way.
+ 
+            <p className="text-gray-400 text-lg max-w-xl mx-auto mb-10 leading-relaxed">
+              Exchange skills 1-on-1, earn XP, level up, and unlock rewards. Learning has never been this fun.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/register" className="btn-primary text-lg px-8 py-4 flex items-center justify-center gap-2">
-                Start Your Journey <ArrowRight className="w-5 h-5" />
+ 
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link to="/register">
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="flex items-center gap-2 px-7 py-3.5 bg-gradient-to-r from-sky-500 to-violet-600 hover:from-sky-400 hover:to-violet-500 text-white font-bold rounded-2xl shadow-xl shadow-sky-500/25 transition-all text-base"
+                >
+                  Start for free <ArrowRight className="w-5 h-5" />
+                </motion.button>
               </Link>
-              <Link to="/login" className="btn-ghost text-lg px-8 py-4 border border-gray-700">
-                I Already Have an Account
+              <Link to="/login" className="flex items-center gap-2 px-7 py-3.5 bg-white/5 hover:bg-white/8 border border-white/10 text-white font-medium rounded-2xl transition-all text-sm">
+                I have an account
               </Link>
             </div>
-          </motion.div>
-
-          {/* Floating Elements */}
-          <motion.div 
-            className="mt-16 relative"
-            animate={{ y: [0, -10, 0] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <div className="inline-flex items-center gap-4 bg-gray-800/80 backdrop-blur-sm rounded-2xl px-6 py-3 border border-gray-700">
-              <span className="text-2xl">🎮</span>
-              <div className="text-left">
-                <p className="font-semibold">Ready to play?</p>
-                <p className="text-sm text-gray-400">Complete sessions, earn XP, level up!</p>
-              </div>
+ 
+            <div className="flex items-center justify-center gap-6 mt-10 text-sm text-gray-500">
+              {['No credit card', 'Free forever', '100% peer-to-peer'].map((t, i) => (
+                <span key={i} className="flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5 text-green-500" /> {t}
+                </span>
+              ))}
             </div>
           </motion.div>
         </div>
-      </header>
-
-      {/* Stats Section */}
-      <section className="py-16 border-y border-gray-800 bg-gray-900/50">
-        <div className="container mx-auto px-6">
+ 
+        {/* Scroll indicator */}
+        <motion.div
+          className="absolute bottom-8 left-1/2 -translate-x-1/2"
+          animate={{ y: [0, 8, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >
+          <ChevronDown className="w-5 h-5 text-gray-600" />
+        </motion.div>
+      </section>
+ 
+      {/* ─── STATS ─── */}
+      <section className="py-20 border-y border-white/5 bg-gray-900/40">
+        <div className="max-w-5xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat, index) => (
-              <motion.div 
-                key={index}
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.1 }}
+            {[
+              { to: 10000, suffix: '+', label: 'Active Learners', icon: Users, color: 'text-sky-400' },
+              { to: 50000, suffix: '+', label: 'Skills Exchanged', icon: Zap, color: 'text-violet-400' },
+              { to: 4.9, suffix: '★', label: 'Average Rating', icon: Star, color: 'text-yellow-400', isFloat: true },
+              { to: 100, suffix: '%', label: 'Free Forever', icon: Coins, color: 'text-green-400' },
+            ].map((s, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
                 className="text-center"
               >
-                <p className="text-4xl font-bold text-gradient mb-2">{stat.value}</p>
-                <p className="text-gray-400">{stat.label}</p>
+                <s.icon className={`w-6 h-6 ${s.color} mx-auto mb-3`} />
+                <p className={`text-4xl font-black ${s.color} tabular-nums`}>
+                  {s.isFloat ? s.to : <Counter to={s.to} suffix={s.suffix} />}
+                  {s.isFloat ? s.suffix : ''}
+                </p>
+                <p className="text-gray-500 text-sm mt-1">{s.label}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
-
-      {/* Features Section */}
-      <section className="py-20">
-        <div className="container mx-auto px-6">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
+ 
+      {/* ─── HOW IT WORKS ─── */}
+      <section className="py-24">
+        <div className="max-w-5xl mx-auto px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl font-bold mb-4">How It Works</h2>
-            <p className="text-gray-400 max-w-xl mx-auto">
-              Three simple steps to start your skill exchange journey
-            </p>
+            <h2 className="text-4xl font-black mb-4">How it works</h2>
+            <p className="text-gray-500 max-w-md mx-auto">Three steps to your first skill exchange session</p>
           </motion.div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
+ 
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              { step: '01', icon: '🎯', title: 'Add your skills', desc: 'List what you can teach and what you want to learn. Our algorithm finds your perfect match.', color: 'from-sky-500/20 to-sky-600/10 border-sky-500/20' },
+              { step: '02', icon: '🤝', title: 'Match & connect', desc: 'Get matched with peers who complement your skills. Accept, schedule, and meet 1-on-1.', color: 'from-violet-500/20 to-violet-600/10 border-violet-500/20' },
+              { step: '03', icon: '⚡', title: 'Earn & level up', desc: 'Complete sessions to earn XP, coins, and badges. Climb leaderboards and unlock rewards.', color: 'from-yellow-500/20 to-yellow-600/10 border-yellow-500/20' },
+            ].map((item, i) => (
               <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 30 }}
+                key={i}
+                initial={{ opacity: 0, y: 24 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.2 }}
-                whileHover={{ y: -5 }}
-                className="game-card group"
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.15 }}
+                className={`relative p-6 rounded-2xl bg-gradient-to-br border ${item.color} group hover:scale-[1.02] transition-transform`}
               >
-                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
-                  <feature.icon className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                <p className="text-gray-400">{feature.description}</p>
+                <div className="text-4xl mb-4">{item.icon}</div>
+                <div className="text-xs font-bold text-gray-600 mb-2">{item.step}</div>
+                <h3 className="text-lg font-bold text-white mb-2">{item.title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">{item.desc}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
-
-      {/* Gamification Preview */}
-      <section className="py-20 bg-gradient-to-b from-gray-900 to-gray-800">
-        <div className="container mx-auto px-6">
+ 
+      {/* ─── FEATURES ─── */}
+      <section className="py-24 bg-gray-900/40">
+        <div className="max-w-5xl mx-auto px-6">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <motion.div
-              initial={{ opacity: 0, x: -30 }}
+              initial={{ opacity: 0, x: -24 }}
               whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
             >
-              <h2 className="text-4xl font-bold mb-6">
-                Level Up Your <span className="text-gradient">Skills</span>
+              <h2 className="text-4xl font-black mb-6">
+                Learning that feels<br />
+                <span className="bg-gradient-to-r from-sky-400 to-violet-400 bg-clip-text text-transparent">like a game</span>
               </h2>
-              <div className="space-y-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-primary-500/20 flex items-center justify-center flex-shrink-0">
-                    <Zap className="w-5 h-5 text-primary-400" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-1">Earn XP & Coins</h4>
-                    <p className="text-gray-400 text-sm">Complete sessions, win games, maintain streaks to earn rewards.</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-gold-400/20 flex items-center justify-center flex-shrink-0">
-                    <Trophy className="w-5 h-5 text-gold-400" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-1">Unlock Achievements</h4>
-                    <p className="text-gray-400 text-sm">Collect badges for milestones and show off your progress.</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-secondary-500/20 flex items-center justify-center flex-shrink-0">
-                    <Gamepad2 className="w-5 h-5 text-secondary-400" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-1">Play Mini-Games</h4>
-                    <p className="text-gray-400 text-sm">Speed Match and Daily Spins keep learning fun and engaging.</p>
-                  </div>
-                </div>
+              <div className="space-y-4">
+                {[
+                  { icon: Zap, title: 'XP & Levels', desc: 'Earn experience points for every session, game win, and daily login.', color: 'text-yellow-400 bg-yellow-400/10' },
+                  { icon: Trophy, title: 'Achievements & Badges', desc: 'Unlock 8+ achievement badges as you hit milestones on your journey.', color: 'text-violet-400 bg-violet-400/10' },
+                  { icon: Gamepad2, title: 'Mini Games', desc: 'Speed Match and Daily Spin Wheel keep the grind fun and rewarding.', color: 'text-sky-400 bg-sky-400/10' },
+                  { icon: Flame, title: 'Daily Streaks', desc: 'Log in every day to maintain your streak and earn bonus coins.', color: 'text-orange-400 bg-orange-400/10' },
+                ].map((f, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -16 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.1 }}
+                    className="flex items-start gap-4 p-4 bg-gray-900 border border-white/5 rounded-xl hover:border-white/10 transition-colors"
+                  >
+                    <div className={`w-9 h-9 rounded-lg ${f.color} flex items-center justify-center shrink-0`}>
+                      <f.icon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-white text-sm">{f.title}</p>
+                      <p className="text-gray-500 text-xs mt-0.5">{f.desc}</p>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
             </motion.div>
-
+ 
+            {/* Live "profile" mockup */}
             <motion.div
-              initial={{ opacity: 0, x: 30 }}
+              initial={{ opacity: 0, x: 24 }}
               whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
               className="relative"
             >
-              <div className="bg-gray-800 rounded-3xl p-6 border border-gray-700">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center text-2xl">
-                    🎯
-                  </div>
+              <div className="bg-gray-900 border border-white/8 rounded-2xl p-6 shadow-2xl">
+                <div className="flex items-center gap-4 mb-5">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-sky-500 to-violet-600 flex items-center justify-center text-xl font-bold">A</div>
                   <div>
-                    <p className="font-bold">Alex_Coder</p>
-                    <p className="text-sm text-gray-400">Level 7 - Proficient</p>
+                    <p className="font-bold text-white">Alex_Coder</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs px-2 py-0.5 bg-sky-500/20 text-sky-400 rounded-full border border-sky-500/20">Level 7</span>
+                      <span className="text-xs text-gray-500">Proficient</span>
+                    </div>
                   </div>
                   <div className="ml-auto text-right">
-                    <p className="text-gold-400 font-bold">2,450 XP</p>
-                    <p className="text-sm text-gray-400">Next: 2,800 XP</p>
+                    <div className="flex items-center gap-1 text-yellow-400">
+                      <Coins className="w-3.5 h-3.5" />
+                      <span className="font-bold text-sm">850</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-orange-400 mt-0.5">
+                      <Flame className="w-3 h-3" />
+                      <span className="text-xs">15d streak</span>
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>Level Progress</span>
-                      <span>82%</span>
-                    </div>
-                    <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
-                      <div className="h-full w-[82%] bg-gradient-to-r from-primary-400 to-secondary-400 rounded-full" />
-                    </div>
+ 
+                <div className="mb-4">
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-gray-400">Level 7 → 8</span>
+                    <span className="text-sky-400 font-medium">2,450 / 2,800 XP</span>
                   </div>
-                  <div className="flex gap-2 flex-wrap">
-                    <span className="px-3 py-1 bg-primary-500/20 text-primary-300 rounded-full text-sm">🏆 Skill Master</span>
-                    <span className="px-3 py-1 bg-gold-400/20 text-gold-400 rounded-full text-sm">🔥 15 Day Streak</span>
-                    <span className="px-3 py-1 bg-secondary-500/20 text-secondary-300 rounded-full text-sm">⚡ Speed Demon</span>
+                  <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-sky-400 to-violet-500 rounded-full"
+                      initial={{ width: 0 }}
+                      whileInView={{ width: '82%' }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 1.2, delay: 0.3 }}
+                    />
                   </div>
+                </div>
+ 
+                <div className="flex flex-wrap gap-1.5 mb-4">
+                  {['🏆 Skill Master', '🔥 Streak 15', '⚡ Speed Demon', '🎯 First Steps'].map(b => (
+                    <span key={b} className="text-xs px-2.5 py-1 bg-gray-800 border border-white/5 rounded-full text-gray-300">{b}</span>
+                  ))}
+                </div>
+ 
+                <div className="grid grid-cols-2 gap-2">
+                  {[['📚 React.js', 'Teaching', 'sky'], ['🎯 Python', 'Learning', 'violet']].map(([s, t, c]) => (
+                    <div key={s} className={`p-3 rounded-xl bg-${c}-500/10 border border-${c}-500/20`}>
+                      <p className="text-xs font-medium text-white">{s}</p>
+                      <p className={`text-xs text-${c}-400 mt-0.5`}>{t}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
+ 
+              {/* Floating notification */}
+              <motion.div
+                className="absolute -right-4 -top-4 bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg"
+                animate={{ y: [0, -4, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                🎉 +50 XP earned!
+              </motion.div>
             </motion.div>
           </div>
         </div>
       </section>
-
-      {/* CTA Section */}
-      <section className="py-20">
-        <div className="container mx-auto px-6 text-center">
+ 
+      {/* ─── TESTIMONIALS ─── */}
+      <section className="py-24">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <h2 className="text-4xl font-black mb-3">Real people, real results</h2>
+          <p className="text-gray-500 mb-12">What our community says</p>
+ 
+          <div className="relative h-44">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={testimonialIdx}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -16 }}
+                transition={{ duration: 0.4 }}
+                className="absolute inset-0 flex flex-col items-center"
+              >
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-sky-500 to-violet-600 flex items-center justify-center text-xl font-bold mb-4">
+                  {TESTIMONIALS[testimonialIdx].avatar}
+                </div>
+                <p className="text-gray-300 text-lg italic mb-4 max-w-lg">
+                  "{TESTIMONIALS[testimonialIdx].text}"
+                </p>
+                <div className="flex items-center gap-3">
+                  <p className="font-semibold text-white">{TESTIMONIALS[testimonialIdx].name}</p>
+                  <span className="text-gray-600">·</span>
+                  <p className="text-gray-500 text-sm">{TESTIMONIALS[testimonialIdx].role}</p>
+                  <span className="text-gray-600">·</span>
+                  <p className="text-sky-400 text-sm font-medium">{TESTIMONIALS[testimonialIdx].xp.toLocaleString()} XP</p>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+ 
+          {/* Dots */}
+          <div className="flex justify-center gap-2 mt-4">
+            {TESTIMONIALS.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setTestimonialIdx(i)}
+                className={`w-2 h-2 rounded-full transition-all ${i === testimonialIdx ? 'bg-sky-400 w-6' : 'bg-gray-700'}`}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+ 
+      {/* ─── CTA ─── */}
+      <section className="py-24 bg-gray-900/40">
+        <div className="max-w-3xl mx-auto px-6 text-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
-            className="bg-gradient-to-r from-primary-500/20 via-secondary-500/20 to-primary-500/20 rounded-3xl p-12 border border-primary-500/30"
+            viewport={{ once: true }}
+            className="bg-gradient-to-br from-sky-500/15 via-violet-500/10 to-sky-500/5 border border-sky-500/20 rounded-3xl p-12"
           >
-            <h2 className="text-4xl font-bold mb-4">Ready to Start Swapping?</h2>
-            <p className="text-gray-400 mb-8 max-w-lg mx-auto">
-              Join thousands of students who are already learning, teaching, and having fun together.
+            <div className="text-5xl mb-4">🚀</div>
+            <h2 className="text-4xl font-black mb-4">Ready to start swapping?</h2>
+            <p className="text-gray-400 mb-8 max-w-md mx-auto">
+              Join thousands of students already learning, teaching, and leveling up together.
             </p>
-            <Link to="/register" className="btn-primary text-lg px-10 py-4">
-              Create Free Account <ArrowRight className="inline w-5 h-5 ml-2" />
+            <Link to="/register">
+              <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-sky-500 to-violet-600 hover:from-sky-400 hover:to-violet-500 text-white font-bold rounded-2xl shadow-2xl shadow-sky-500/30 transition-all text-lg"
+              >
+                Create Free Account <ArrowRight className="w-5 h-5" />
+              </motion.button>
             </Link>
+            <p className="text-gray-600 text-xs mt-5">No credit card · Free forever · 100+ skills available</p>
           </motion.div>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-800 py-12 bg-gray-900">
-        <div className="container mx-auto px-6">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center">
-                  <span className="text-xl">⚡</span>
-                </div>
-                <span className="text-xl font-bold text-gradient">SkillSwap</span>
-              </div>
-              <p className="text-gray-400 text-sm">
-                The gamified peer-to-peer skill exchange platform for students. Learn, teach, and grow together.
-              </p>
+ 
+      {/* ─── FOOTER ─── */}
+      <footer className="border-t border-white/5 py-10">
+        <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-gradient-to-br from-sky-500 to-violet-600 rounded-lg flex items-center justify-center">
+              <Zap className="w-3.5 h-3.5 text-white" />
             </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-white">Platform</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><Link to="/explore" className="hover:text-primary-400">Explore Skills</Link></li>
-                <li><Link to="/leaderboard" className="hover:text-primary-400">Leaderboard</Link></li>
-                <li><Link to="/games" className="hover:text-primary-400">Mini Games</Link></li>
-                <li><Link to="/shop" className="hover:text-primary-400">Rewards Shop</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-white">Company</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-primary-400">About Us</a></li>
-                <li><a href="#" className="hover:text-primary-400">Contact</a></li>
-                <li><a href="#" className="hover:text-primary-400">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-primary-400">Terms of Service</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-white">Connect</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-primary-400">Twitter</a></li>
-                <li><a href="#" className="hover:text-primary-400">Discord</a></li>
-                <li><a href="#" className="hover:text-primary-400">GitHub</a></li>
-                <li><a href="#" className="hover:text-primary-400">Instagram</a></li>
-              </ul>
-            </div>
+            <span className="font-bold text-sm bg-gradient-to-r from-sky-400 to-violet-400 bg-clip-text text-transparent">SkillSwap</span>
           </div>
-          <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-gray-500 text-sm">
-              © 2024 SkillSwap. All rights reserved.
-            </p>
-            <div className="flex items-center gap-4">
-              <span className="text-gray-500 text-sm">Made with care for students everywhere</span>
-            </div>
+          <div className="flex gap-6 text-sm text-gray-600">
+            {['Explore', 'Leaderboard', 'Games', 'Shop'].map(l => (
+              <Link key={l} to={`/${l.toLowerCase()}`} className="hover:text-gray-400 transition-colors">{l}</Link>
+            ))}
           </div>
+          <p className="text-gray-700 text-xs">© 2025 SkillSwap · Made with ❤️ for learners</p>
         </div>
       </footer>
     </div>
   );
-};
-
-export default Home;
+}
