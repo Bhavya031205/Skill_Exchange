@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // 1. Add useEffect here
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
@@ -7,13 +7,23 @@ import toast from 'react-hot-toast';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  
+  // 2. Extract 'user' (or 'isAuthenticated') from your AuthContext
+  const { login, user } = useAuth(); 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
+
+  // 3. Add this useEffect! It watches the 'user' state.
+  // Whenever 'user' becomes a real value (successful login), it redirects.
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,7 +32,8 @@ const Login = () => {
     try {
       await login(formData.email, formData.password);
       toast.success('Welcome back! 🎉');
-      navigate('/dashboard');
+      // 4. REMOVE the navigate('/dashboard') from here! 
+      // The useEffect above will handle it now.
     } catch (error) {
       toast.error(error.response?.data?.message || 'Login failed');
     } finally {
