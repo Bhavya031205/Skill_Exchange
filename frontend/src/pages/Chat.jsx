@@ -1,116 +1,113 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Send, ArrowLeft, Calendar, Video } from 'lucide-react';
+import { Send, ArrowLeft, Calendar, Video, MessageCircle } from 'lucide-react';
 import { sessionsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
 import toast from 'react-hot-toast';
 
 const Chat = () => {
   const { sessionId } = useParams();
   const { user } = useAuth();
-  const { socket, joinSession, leaveSession, sendMessage, startTyping, stopTyping, markRead } = useSocket();
   const [sessions, setSessions] = useState([]);
   const [currentSession, setCurrentSession] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [typingUsers, setTypingUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
+  const pollingRef = useRef(null);
 
-  useEffect(() => {
-    loadSessions();
-  }, []);
-
-  useEffect(() => {
-    if (sessionId) {
-      loadCurrentSession();
-    }
-  }, [sessionId]);
-
-  useEffect(() => {
-    if (!socket || !sessionId) return;
-
-    joinSession(sessionId);
-    markRead(sessionId);
-
-    socket.on('new_message', (message) => {
-      setMessages(prev => [...prev, message]);
-      if (message.senderId !== user?.id) {
-        markRead(sessionId);
-      }
-    });
-
-    socket.on('user_typing', ({ userId, username }) => {
-      if (userId !== user?.id) {
-        setTypingUsers(prev => [...new Set([...prev, username])]);
-      }
-    });
-
-    socket.on('user_stop_typing', ({ userId }) => {
-      setTypingUsers(prev => prev.filter(u => u !== 'unknown'));
-    });
-
-    return () => {
-      leaveSession(sessionId);
-      socket.off('new_message');
-      socket.off('user_typing');
-      socket.off('user_stop_typing');
-    };
-  }, [socket, sessionId]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async () => {
     try {
       const response = await sessionsApi.getAll({ status: 'confirmed' });
       setSessions(response.data.data);
-      if (sessionId) {
-        setCurrentSession(response.data.data.find(s => s.id === sessionId));
-      }
     } catch (error) {
-      toast.error('Failed to load sessions');
+      // Silently fail
     } finally {
-      setLoading(false);
+      if (sessionId) {
+        loadCurrentSession();
+      } else {
+        setLoading(false);
+      }
     }
-  };
+  }, [sessionId]);
 
-  const loadCurrentSession = async () => {
-    if (!sessionId) return;
+  const loadCurrentSession = useCallback(async () => {
+    if (!sessionId) {
+      setLoading(false);
+      return;
+    }
     try {
       const response = await sessionsApi.getOne(sessionId);
       setCurrentSession(response.data.data);
       setMessages(response.data.data.messages || []);
     } catch (error) {
       toast.error('Failed to load session');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [sessionId]);
 
-  const handleSendMessage = (e) => {
+  useEffect(() => {
+    loadSessions();
+    
+    if (sessionId) {
+      pollingRef.current = setInterval(() => {
+        loadCurrentSession();
+      }, 3000);
+    }
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, [sessionId, loadSessions, loadCurrentSession]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, currentSession]);
+
+  const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || !sessionId) return;
+    if (!newMessage.trim() || !sessionId || sending) return;
 
-    sendMessage(sessionId, newMessage.trim());
+    const messageContent = newMessage.trim();
+    setSending(true);
     setNewMessage('');
-    stopTyping(sessionId);
-  };
 
-  const handleTyping = () => {
-    if (sessionId) {
-      startTyping(sessionId);
-    }
-  };
+    try {
+      const tempMessage = {
+        id: `temp-${Date.now()}`,
+        content: messageContent,
+        senderId: user?.id,
+        sender: { username: user?.username },
+        createdAt: new Date().toISOString(),
+        pending: true
+      };
+      setMessages(prev => [...prev, tempMessage]);
 
-  const handleStopTyping = () => {
-    if (sessionId) {
-      stopTyping(sessionId);
+      await sessionsApi.update(sessionId, { 
+        message: messageContent 
+      });
+
+      setMessages(prev => prev.map(m => 
+        m.id === tempMessage.id ? { ...m, pending: false } : m
+      ));
+      
+      await loadCurrentSession();
+    } catch (error) {
+      setMessages(prev => prev.filter(m => !m.id.startsWith('temp-')));
+      setNewMessage(messageContent);
+      toast.error('Failed to send message');
+    } finally {
+      setSending(false);
     }
   };
 
   const formatTime = (date) => {
+    if (!date) return '';
     return new Date(date).toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit'
@@ -210,24 +207,35 @@ const Chat = () => {
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.map((message) => {
-                  const isMine = message.senderId === user?.id;
-                  return (
-                    <motion.div
-                      key={message.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div className={`chat-bubble ${isMine ? 'chat-bubble-sent' : 'chat-bubble-received'}`}>
-                        <p>{message.content}</p>
-                        <p className="text-xs opacity-70 mt-1">
-                          {formatTime(message.createdAt)}
-                        </p>
-                      </div>
-                    </motion.div>
-                  );
-                })}
+                {messages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <MessageCircle className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                      <p className="text-gray-400">No messages yet</p>
+                      <p className="text-sm text-gray-500">Send a message to start the conversation!</p>
+                    </div>
+                  </div>
+                ) : (
+                  messages.map((message) => {
+                    const isMine = message.senderId === user?.id;
+                    return (
+                      <motion.div
+                        key={message.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div className={`chat-bubble ${isMine ? 'chat-bubble-sent' : 'chat-bubble-received'} ${message.pending ? 'opacity-50' : ''}`}>
+                          <p>{message.content}</p>
+                          <p className="text-xs opacity-70 mt-1 flex items-center gap-1">
+                            {formatTime(message.createdAt)}
+                            {isMine && message.pending && <span className="text-[8px]">•</span>}
+                          </p>
+                        </div>
+                      </motion.div>
+                    );
+                  })
+                )}
                 <div ref={messagesEndRef} />
               </div>
 

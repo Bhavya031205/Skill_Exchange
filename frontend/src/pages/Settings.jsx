@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import { authApi } from '../services/api';
 import toast from 'react-hot-toast';
 import {
   User, Lock, Bell, Palette, Shield, Trash2,
   Save, ChevronRight, Check, Moon, Sun, Monitor,
-  Eye, EyeOff, AlertTriangle
+  Eye, EyeOff, AlertTriangle, Camera
 } from 'lucide-react';
+
+const THEMES = ['dark', 'light', 'system'];
+const ACCENT_COLORS = ['sky', 'violet', 'pink', 'emerald', 'orange'];
  
 const sections = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -18,19 +22,25 @@ const sections = [
 ];
  
 const Settings = () => {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, fetchUser } = useAuth();
   const [activeSection, setActiveSection] = useState('profile');
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
- 
+  const fileInputRef = useRef(null);
+
+  const [settings, setSettings] = useState({
+    theme: localStorage.getItem('theme') || 'dark',
+    accentColor: localStorage.getItem('accentColor') || 'sky',
+  });
+
   const [profileForm, setProfileForm] = useState({
     username: user?.username || '',
     bio: user?.bio || '',
     avatarUrl: user?.avatarUrl || '',
   });
- 
+
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
- 
+
   const [notifSettings, setNotifSettings] = useState({
     matchRequests: true,
     sessionReminders: true,
@@ -39,7 +49,7 @@ const Settings = () => {
     weeklyDigest: false,
     marketing: false,
   });
- 
+
   const [privacySettings, setPrivacySettings] = useState({
     profilePublic: true,
     showEmail: false,
@@ -47,35 +57,74 @@ const Settings = () => {
     showXP: true,
     allowMessages: true,
   });
- 
+
+  const applyTheme = (theme, accentColor) => {
+    const root = document.documentElement;
+    if (theme === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      root.classList.toggle('dark', prefersDark);
+      localStorage.setItem('theme', 'system');
+    } else {
+      root.classList.toggle('dark', theme === 'dark');
+      localStorage.setItem('theme', theme);
+    }
+    document.documentElement.setAttribute('data-accent', accentColor);
+    localStorage.setItem('accentColor', accentColor);
+  };
+
+  const handleThemeChange = (theme) => {
+    setSettings(prev => ({ ...prev, theme }));
+    applyTheme(theme, settings.accentColor);
+  };
+
+  const handleColorChange = (color) => {
+    setSettings(prev => ({ ...prev, accentColor: color }));
+    applyTheme(settings.theme, color);
+  };
+
   const handleSaveProfile = async () => {
     setSaving(true);
     try {
-      await new Promise(r => setTimeout(r, 800));
+      await authApi.updateProfile(profileForm);
       updateUser(profileForm);
       toast.success('Profile updated!');
-    } catch {
-      toast.error('Failed to save');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save');
     } finally {
       setSaving(false);
     }
   };
- 
-  const handleChangePassword = async (e) => {
-    e.preventDefault();
-    if (passwords.new !== passwords.confirm) {
-      toast.error('Passwords do not match');
+
+  const handleUploadAvatar = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be less than 2MB');
       return;
     }
-    if (passwords.new.length < 6) {
-      toast.error('Password must be at least 6 characters');
-      return;
-    }
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
     setSaving(true);
-    await new Promise(r => setTimeout(r, 800));
-    toast.success('Password changed successfully');
-    setPasswords({ current: '', new: '', confirm: '' });
-    setSaving(false);
+    try {
+      const response = await authApi.uploadAvatar(formData);
+      const newAvatarUrl = response.data.data.avatarUrl;
+      setProfileForm(prev => ({ ...prev, avatarUrl: newAvatarUrl }));
+      updateUser({ avatarUrl: newAvatarUrl });
+      toast.success('Profile picture updated!');
+    } catch (err) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setProfileForm(prev => ({ ...prev, avatarUrl: e.target.result }));
+        updateUser({ avatarUrl: e.target.result });
+        toast.success('Profile picture updated locally!');
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setSaving(false);
+    }
   };
  
   return (
@@ -128,12 +177,28 @@ const Settings = () => {
                 <div>
                   <label className="block text-xs text-gray-400 mb-2 font-medium">Profile Picture</label>
                   <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-sky-500 to-violet-600 flex items-center justify-center text-2xl font-bold text-white">
-                      {user?.username?.[0]?.toUpperCase()}
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-sky-500 to-violet-600 flex items-center justify-center text-2xl font-bold text-white overflow-hidden">
+                      {profileForm.avatarUrl ? (
+                        <img src={profileForm.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        user?.username?.[0]?.toUpperCase()
+                      )}
                     </div>
                     <div>
-                      <button className="px-3 py-1.5 bg-gray-800 border border-white/10 rounded-lg text-sm text-gray-300 hover:text-white hover:border-white/20 transition-colors">
-                        Upload photo
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleUploadAvatar}
+                        className="hidden"
+                      />
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={saving}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-white/10 rounded-lg text-sm text-gray-300 hover:text-white hover:border-white/20 transition-colors disabled:opacity-50"
+                      >
+                        <Camera className="w-4 h-4" />
+                        {profileForm.avatarUrl ? 'Change photo' : 'Upload photo'}
                       </button>
                       <p className="text-xs text-gray-600 mt-1">JPG, PNG up to 2MB</p>
                     </div>
@@ -303,35 +368,48 @@ const Settings = () => {
                 <div>
                   <label className="block text-xs text-gray-400 mb-3 font-medium">Theme</label>
                   <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { id: 'dark', label: 'Dark', icon: Moon },
-                      { id: 'light', label: 'Light', icon: Sun },
-                      { id: 'system', label: 'System', icon: Monitor },
-                    ].map((theme) => (
-                      <button
-                        key={theme.id}
-                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-sm font-medium transition-all ${
-                          theme.id === 'dark'
-                            ? 'border-sky-500 bg-sky-500/10 text-sky-400'
-                            : 'border-white/10 text-gray-400 hover:border-white/20 hover:text-white'
-                        }`}
-                      >
-                        <theme.icon className="w-5 h-5" />
-                        {theme.label}
-                        {theme.id === 'dark' && <Check className="w-3 h-3" />}
-                      </button>
-                    ))}
+                    {THEMES.map((themeId) => {
+                      const icons = { dark: Moon, light: Sun, system: Monitor };
+                      const Icon = icons[themeId];
+                      return (
+                        <button
+                          key={themeId}
+                          onClick={() => handleThemeChange(themeId)}
+                          className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-sm font-medium transition-all ${
+                            settings.theme === themeId
+                              ? 'border-sky-500 bg-sky-500/10 text-sky-400'
+                              : 'border-white/10 text-gray-400 hover:border-white/20 hover:text-white'
+                          }`}
+                        >
+                          <Icon className="w-5 h-5" />
+                          {themeId.charAt(0).toUpperCase() + themeId.slice(1)}
+                          {settings.theme === themeId && <Check className="w-3 h-3" />}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 <div>
                   <label className="block text-xs text-gray-400 mb-3 font-medium">Accent Color</label>
                   <div className="flex gap-2">
-                    {['bg-sky-500', 'bg-violet-500', 'bg-pink-500', 'bg-emerald-500', 'bg-orange-500'].map((color) => (
-                      <button
-                        key={color}
-                        className={`w-8 h-8 rounded-full ${color} ${color === 'bg-sky-500' ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-900' : ''} transition-transform hover:scale-110`}
-                      />
-                    ))}
+                    {ACCENT_COLORS.map((color) => {
+                      const colorClasses = {
+                        sky: 'bg-sky-500',
+                        violet: 'bg-violet-500',
+                        pink: 'bg-pink-500',
+                        emerald: 'bg-emerald-500',
+                        orange: 'bg-orange-500',
+                      };
+                      return (
+                        <button
+                          key={color}
+                          onClick={() => handleColorChange(color)}
+                          className={`w-8 h-8 rounded-full ${colorClasses[color]} ${
+                            settings.accentColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-900' : ''
+                          } transition-transform hover:scale-110`}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               </motion.div>

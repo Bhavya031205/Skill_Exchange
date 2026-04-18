@@ -1,15 +1,21 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, Filter, Users, Star, TrendingUp } from 'lucide-react';
-import { skillsApi, matchesApi } from '../services/api';
+import { Search, Filter, Users, Star, TrendingUp, ExternalLink, Calendar, Clock, Video } from 'lucide-react';
+import { skillsApi, matchesApi, sessionsApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
 const Explore = () => {
+  const { user } = useAuth();
   const [skills, setSkills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
   const [matching, setMatching] = useState(false);
+  const [sessionModal, setSessionModal] = useState(null);
+  const [sessionForm, setSessionForm] = useState({ skillName: '', duration: 30, notes: '' });
+  const [requesting, setRequesting] = useState(false);
 
   useEffect(() => {
     loadSkills();
@@ -35,6 +41,44 @@ const Explore = () => {
       toast.error('Failed to find matches');
     } finally {
       setMatching(false);
+    }
+  };
+
+  const handleRequestSession = (skill) => {
+    if (!user) {
+      toast.error('Please login to request a session');
+      return;
+    }
+    if (skill.userId === user.id) {
+      toast.error("You can't request a session with yourself");
+      return;
+    }
+    setSessionModal(skill);
+    setSessionForm({ 
+      skillName: skill.skillName, 
+      duration: 30, 
+      notes: `Hi! I'd like to ${skill.skillType === 'teach' ? 'learn' : 'teach'} ${skill.skillName} with you.` 
+    });
+  };
+
+  const submitSessionRequest = async (e) => {
+    e.preventDefault();
+    if (!sessionModal) return;
+    
+    setRequesting(true);
+    try {
+      const response = await sessionsApi.create({
+        skillName: sessionForm.skillName,
+        skillId: sessionModal.id,
+        duration: sessionForm.duration,
+        notes: sessionForm.notes
+      });
+      toast.success('Session request sent!');
+      setSessionModal(null);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to send request');
+    } finally {
+      setRequesting(false);
     }
   };
 
@@ -101,7 +145,7 @@ const Explore = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className="card-glow p-4"
+              className="card-glow p-4 cursor-pointer group"
             >
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center text-xl">
@@ -118,12 +162,16 @@ const Explore = () => {
                       {skill.skillType === 'teach' ? 'Can Teach' : 'Wants to Learn'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 mt-1">
+                  <Link 
+                    to={`/profile/${skill.userId}`}
+                    className="flex items-center gap-3 mt-1 hover:underline group/link"
+                  >
                     <span className="text-sm text-gray-400">@{skill.user?.username}</span>
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 text-gold-400 fill-gold-400" />
-                      <span className="text-sm">{skill.user?.rating?.toFixed(1) || 'New'}</span>
-                    </div>
+                    <ExternalLink className="w-3 h-3 text-gray-600 opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                  </Link>
+                  <div className="flex items-center gap-1 mt-1">
+                    <Star className="w-4 h-4 text-gold-400 fill-gold-400" />
+                    <span className="text-sm">{skill.user?.rating?.toFixed(1) || 'New'}</span>
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     {[...Array(5)].map((_, i) => (
@@ -138,8 +186,91 @@ const Explore = () => {
                   </div>
                 </div>
               </div>
+              {skill.description && (
+                <p className="text-xs text-gray-500 mt-3 line-clamp-2">{skill.description}</p>
+              )}
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">
+                <Link
+                  to={`/profile/${skill.userId}`}
+                  className="flex-1 text-center py-2 bg-primary-500/10 hover:bg-primary-500/20 text-primary-400 text-sm rounded-lg transition-colors"
+                >
+                  View Profile
+                </Link>
+                {user && skill.userId !== user.id && (
+                  <button
+                    onClick={() => handleRequestSession(skill)}
+                    className="flex-1 text-center py-2 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 text-sm rounded-lg transition-colors flex items-center justify-center gap-1"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Request
+                  </button>
+                )}
+              </div>
             </motion.div>
           ))}
+        </div>
+      )}
+
+      {/* Session Request Modal */}
+      {sessionModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-md"
+          >
+            <h3 className="text-xl font-bold text-white mb-4">Request Session</h3>
+            <form onSubmit={submitSessionRequest} className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1.5 font-medium">Skill</label>
+                <input
+                  type="text"
+                  value={sessionForm.skillName}
+                  onChange={e => setSessionForm({ ...sessionForm, skillName: e.target.value })}
+                  className="w-full bg-gray-800 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1.5 font-medium">Duration</label>
+                <select
+                  value={sessionForm.duration}
+                  onChange={e => setSessionForm({ ...sessionForm, duration: parseInt(e.target.value) })}
+                  className="w-full bg-gray-800 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white"
+                >
+                  <option value={15}>15 minutes</option>
+                  <option value={30}>30 minutes</option>
+                  <option value={45}>45 minutes</option>
+                  <option value={60}>1 hour</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1.5 font-medium">Message</label>
+                <textarea
+                  rows={3}
+                  value={sessionForm.notes}
+                  onChange={e => setSessionForm({ ...sessionForm, notes: e.target.value })}
+                  placeholder="Introduce yourself and explain why you want to learn/teach this skill..."
+                  className="w-full bg-gray-800 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 resize-none"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSessionModal(null)}
+                  className="flex-1 py-2.5 text-gray-400 text-sm hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={requesting}
+                  className="flex-1 py-2.5 bg-sky-500 hover:bg-sky-600 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50"
+                >
+                  {requesting ? 'Sending...' : 'Send Request'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
         </div>
       )}
 

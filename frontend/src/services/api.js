@@ -78,7 +78,12 @@ export const authApi = {
   login: (email, password) => api.post('/auth/login', { email, password }),
   register: (data) => api.post('/auth/register', data),
   getMe: () => api.get('/auth/me'),
-  getUser: (id) => api.get(`/auth/users/${id}`)
+  getUser: (id) => api.get(`/auth/users/${id}`),
+  updateProfile: (data) => api.put('/auth/profile', data),
+  uploadAvatar: (formData) => api.put('/auth/avatar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  changePassword: (data) => api.put('/auth/password', data),
 };
 
 export const skillsApi = {
@@ -95,7 +100,15 @@ export const sessionsApi = {
   getOne: (id) => api.get(`/sessions/${id}`),
   create: (data) => api.post('/sessions', data),
   update: (id, data) => api.put(`/sessions/${id}`, data),
-  complete: (id, data) => api.post(`/sessions/${id}/complete`, data)
+  complete: (id, data) => api.post(`/sessions/${id}/complete`, data),
+  request: (skillId, data) => api.post(`/sessions/request`, { skillId, ...data }),
+};
+
+export const notificationsApi = {
+  getAll: (params) => api.get('/notifications', { params }),
+  markRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllRead: () => api.put('/notifications/read-all'),
+  delete: (id) => api.delete(`/notifications/${id}`),
 };
 
 export const matchesApi = {

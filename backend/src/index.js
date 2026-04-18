@@ -15,6 +15,7 @@ const sessionRoutes = require('./routes/sessions');
 const matchRoutes = require('./routes/matches');
 const gameRoutes = require('./routes/games');
 const shopRoutes = require('./routes/shop');
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 const server = http.createServer(app);
@@ -52,6 +53,7 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/matches', matchRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/shop', shopRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Error handling
 app.use(notFoundHandler);

@@ -6,8 +6,9 @@ import {
   Search, Bell, Settings, LogOut, User, ChevronDown,
   Zap, Coins, Flame, Trophy, LayoutDashboard, Compass,
   Calendar, MessageCircle, ShoppingBag, Gamepad2, X,
-  HelpCircle, BookOpen, Star, Shield, Moon, Sun
+  HelpCircle, BookOpen, Star, Shield, Moon, Sun, Check, CheckCheck
 } from 'lucide-react';
+import { notificationsApi } from '../../services/api';
  
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -17,11 +18,12 @@ const Navbar = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(true);
+  const [notifications, setNotifications] = useState([]);
+  const [notifLoading, setNotifLoading] = useState(false);
   const searchRef = useRef(null);
   const profileRef = useRef(null);
   const notifRef = useRef(null);
- 
+  
   useEffect(() => {
     const handleClick = (e) => {
       if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
@@ -30,10 +32,37 @@ const Navbar = () => {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
- 
+  
   useEffect(() => {
     if (searchOpen && searchRef.current) searchRef.current.focus();
   }, [searchOpen]);
+
+  const loadNotifications = async () => {
+    if (!user) return;
+    try {
+      const response = await notificationsApi.getAll();
+      setNotifications(response.data.data || []);
+    } catch (error) {
+      // Keep using mock notifications as fallback
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      loadNotifications();
+      const interval = setInterval(loadNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationsApi.markAllRead();
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } catch (error) {
+      // Silently fail
+    }
+  };
  
   const getLevelColor = (level) => {
     if (level >= 8) return 'from-yellow-400 to-yellow-600';
@@ -51,10 +80,34 @@ const Navbar = () => {
   ];
  
   const mockNotifs = [
-    { id: 1, text: 'Alex_Coder accepted your match request', time: '2m ago', unread: true, icon: '🤝' },
-    { id: 2, text: 'You earned the "Quick Learner" badge!', time: '1h ago', unread: true, icon: '🏆' },
-    { id: 3, text: 'Sarah_Designs scheduled a session with you', time: '3h ago', unread: false, icon: '📅' },
+    { id: 'mock-1', text: 'Welcome to SkillSwap! Add your skills to get started.', time: 'Just now', unread: true, icon: '👋' },
+    { id: 'mock-2', text: 'Complete a session to earn XP and coins!', time: 'Just now', unread: true, icon: '💰' },
   ];
+
+  const getNotificationIcon = (type) => {
+    const icons = {
+      session: '📅',
+      message: '💬',
+      match: '🤝',
+      achievement: '🏆',
+      system: '🔔',
+    };
+    return icons[type] || '🔔';
+  };
+
+  const formatNotifTime = (date) => {
+    if (!date) return 'Just now';
+    const now = new Date();
+    const notifDate = new Date(date);
+    const diff = now - notifDate;
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
  
   const handleSearch = (e) => {
     e.preventDefault();
@@ -175,18 +228,18 @@ const Navbar = () => {
             </div>
           )}
  
-          {/* Notifications */}
+{/* Notifications */}
           <div ref={notifRef} className="relative">
             <button
-              onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }}
+              onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); if (!notifOpen) loadNotifications(); }}
               className="relative p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
             >
               <Bell className="w-5 h-5" />
-              {mockNotifs.some(n => n.unread) && (
+              {(notifications.some(n => n.read === false) || mockNotifs.some(n => n.unread)) && (
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-sky-500 rounded-full ring-2 ring-gray-950" />
               )}
             </button>
- 
+
             <AnimatePresence>
               {notifOpen && (
                 <motion.div
@@ -197,22 +250,32 @@ const Navbar = () => {
                 >
                   <div className="p-4 border-b border-white/5 flex items-center justify-between">
                     <h3 className="font-semibold text-white">Notifications</h3>
-                    <button className="text-xs text-sky-400 hover:text-sky-300">Mark all read</button>
+                    <button 
+                      onClick={handleMarkAllRead}
+                      className="text-xs text-sky-400 hover:text-sky-300 flex items-center gap-1"
+                    >
+                      <CheckCheck className="w-3 h-3" /> Mark all read
+                    </button>
                   </div>
                   <div className="max-h-80 overflow-y-auto">
-                    {mockNotifs.map((notif) => (
+                    {(notifications.length > 0 ? notifications : mockNotifs).slice(0, 10).map((notif) => (
                       <div
                         key={notif.id}
-                        className={`flex items-start gap-3 p-4 hover:bg-white/5 transition-colors cursor-pointer border-b border-white/5 last:border-0 ${notif.unread ? 'bg-sky-500/5' : ''}`}
+                        className={`flex items-start gap-3 p-4 hover:bg-white/5 transition-colors cursor-pointer border-b border-white/5 last:border-0 ${notif.read === false ? 'bg-sky-500/5' : ''}`}
                       >
-                        <span className="text-xl shrink-0">{notif.icon}</span>
+                        <span className="text-xl shrink-0">{notif.icon || getNotificationIcon(notif.type)}</span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-200 leading-snug">{notif.text}</p>
-                          <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
+                          <p className="text-sm text-gray-200 leading-snug">{notif.text || notif.message}</p>
+                          <p className="text-xs text-gray-500 mt-1">{notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString() : notif.time}</p>
                         </div>
-                        {notif.unread && <div className="w-2 h-2 bg-sky-500 rounded-full mt-1 shrink-0" />}
+                        {notif.read === false && <div className="w-2 h-2 bg-sky-500 rounded-full mt-1 shrink-0" />}
                       </div>
                     ))}
+                    {(notifications.length === 0 && mockNotifs.length === 0) && (
+                      <div className="p-8 text-center text-gray-500">
+                        No notifications yet
+                      </div>
+                    )}
                   </div>
                   <div className="p-3 border-t border-white/5">
                     <Link
