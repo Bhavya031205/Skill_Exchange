@@ -6,7 +6,7 @@ import {
   Search, Bell, Settings, LogOut, User, ChevronDown,
   Zap, Coins, Flame, Trophy, LayoutDashboard, Compass,
   Calendar, MessageCircle, ShoppingBag, Gamepad2, X,
-  HelpCircle, BookOpen, Star, Shield, Moon, Sun, Check, CheckCheck
+  HelpCircle, BookOpen, Star, Shield, CheckCheck
 } from 'lucide-react';
 import { notificationsApi } from '../../services/api';
  
@@ -19,11 +19,10 @@ const Navbar = () => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [notifLoading, setNotifLoading] = useState(false);
   const searchRef = useRef(null);
   const profileRef = useRef(null);
   const notifRef = useRef(null);
-  
+ 
   useEffect(() => {
     const handleClick = (e) => {
       if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
@@ -32,11 +31,11 @@ const Navbar = () => {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
-  
+ 
   useEffect(() => {
     if (searchOpen && searchRef.current) searchRef.current.focus();
   }, [searchOpen]);
-
+ 
   const loadNotifications = async () => {
     if (!user) return;
     try {
@@ -46,7 +45,7 @@ const Navbar = () => {
       // Keep using mock notifications as fallback
     }
   };
-
+ 
   useEffect(() => {
     if (user) {
       loadNotifications();
@@ -54,7 +53,7 @@ const Navbar = () => {
       return () => clearInterval(interval);
     }
   }, [user]);
-
+ 
   const handleMarkAllRead = async () => {
     try {
       await notificationsApi.markAllRead();
@@ -71,6 +70,7 @@ const Navbar = () => {
     return 'from-gray-400 to-gray-600';
   };
  
+  // Keep navLinks only for mobile bottom nav
   const navLinks = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/explore', label: 'Explore', icon: Compass },
@@ -83,30 +83,10 @@ const Navbar = () => {
     { id: 'mock-1', text: 'Welcome to SkillSwap! Add your skills to get started.', time: 'Just now', unread: true, icon: '👋' },
     { id: 'mock-2', text: 'Complete a session to earn XP and coins!', time: 'Just now', unread: true, icon: '💰' },
   ];
-
+ 
   const getNotificationIcon = (type) => {
-    const icons = {
-      session: '📅',
-      message: '💬',
-      match: '🤝',
-      achievement: '🏆',
-      system: '🔔',
-    };
+    const icons = { session: '📅', message: '💬', match: '🤝', achievement: '🏆', system: '🔔' };
     return icons[type] || '🔔';
-  };
-
-  const formatNotifTime = (date) => {
-    if (!date) return 'Just now';
-    const now = new Date();
-    const notifDate = new Date(date);
-    const diff = now - notifDate;
-    const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
   };
  
   const handleSearch = (e) => {
@@ -137,28 +117,7 @@ const Navbar = () => {
             </span>
           </Link>
  
-          {/* Nav Links - Desktop */}
-          <div className="hidden lg:flex items-center gap-1 ml-2">
-            {navLinks.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  location.pathname === item.path
-                    ? 'text-white bg-white/10'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <item.icon className="w-4 h-4" />
-                {item.label}
-                {item.badge && (
-                  <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-sky-500 text-white rounded-full">
-                    {item.badge}
-                  </span>
-                )}
-              </Link>
-            ))}
-          </div>
+          {/* ── Desktop nav links REMOVED — navigation is in the Sidebar ── */}
  
           <div className="flex-1" />
  
@@ -228,7 +187,7 @@ const Navbar = () => {
             </div>
           )}
  
-{/* Notifications */}
+          {/* Notifications */}
           <div ref={notifRef} className="relative">
             <button
               onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); if (!notifOpen) loadNotifications(); }}
@@ -239,7 +198,7 @@ const Navbar = () => {
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-sky-500 rounded-full ring-2 ring-gray-950" />
               )}
             </button>
-
+ 
             <AnimatePresence>
               {notifOpen && (
                 <motion.div
@@ -250,7 +209,7 @@ const Navbar = () => {
                 >
                   <div className="p-4 border-b border-white/5 flex items-center justify-between">
                     <h3 className="font-semibold text-white">Notifications</h3>
-                    <button 
+                    <button
                       onClick={handleMarkAllRead}
                       className="text-xs text-sky-400 hover:text-sky-300 flex items-center gap-1"
                     >
@@ -271,11 +230,6 @@ const Navbar = () => {
                         {notif.read === false && <div className="w-2 h-2 bg-sky-500 rounded-full mt-1 shrink-0" />}
                       </div>
                     ))}
-                    {(notifications.length === 0 && mockNotifs.length === 0) && (
-                      <div className="p-8 text-center text-gray-500">
-                        No notifications yet
-                      </div>
-                    )}
                   </div>
                   <div className="p-3 border-t border-white/5">
                     <Link
@@ -297,7 +251,7 @@ const Navbar = () => {
               onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); }}
               className="flex items-center gap-2 hover:bg-white/5 rounded-xl px-2 py-1.5 transition-colors"
             >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-500 to-violet-600 flex items-center justify-center text-sm font-bold text-white">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-500 to-violet-600 flex items-center justify-center text-sm font-bold text-white overflow-hidden">
                 {user?.avatarUrl ? (
                   <img src={user.avatarUrl} alt="" className="w-full h-full rounded-xl object-cover" />
                 ) : (
@@ -322,8 +276,10 @@ const Navbar = () => {
                   {/* User Info */}
                   <div className="p-4 border-b border-white/5 bg-gradient-to-br from-sky-500/10 to-violet-500/10">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-violet-600 flex items-center justify-center text-lg font-bold text-white">
-                        {user?.username?.[0]?.toUpperCase()}
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-violet-600 flex items-center justify-center text-lg font-bold text-white overflow-hidden">
+                        {user?.avatarUrl ? (
+                          <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                        ) : user?.username?.[0]?.toUpperCase()}
                       </div>
                       <div>
                         <p className="font-semibold text-white">{user?.username}</p>

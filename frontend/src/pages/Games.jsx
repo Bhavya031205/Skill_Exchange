@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Coins, Target, Timer, Trophy, Clock, RotateCcw, CheckCircle } from 'lucide-react';
+import { Zap, Coins, Target, Timer, Trophy, RotateCcw, CheckCircle, X, Star } from 'lucide-react';
 import { gamesApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -37,14 +37,14 @@ const Games = () => {
  
 // ─── SPIN WHEEL ─────────────────────────────────────────────────
 const SEGMENTS = [
-  { label: '5 Coins',    amount: 5,       item: 'coins',       color: '#fbbf24' },
-  { label: '10 Coins',   amount: 10,      item: 'coins',       color: '#f59e0b' },
-  { label: 'Try Again',  amount: 0,       item: 'nothing',     color: '#6b7280' },
-  { label: '20 Coins',   amount: 20,      item: 'coins',       color: '#d97706' },
-  { label: 'XP Boost',   amount: 1,       item: 'xp_boost',    color: '#8b5cf6' },
-  { label: '30 Coins',   amount: 30,      item: 'coins',       color: '#ea580c' },
-  { label: '10 Coins',   amount: 10,      item: 'coins',       color: '#ca8a04' },
-  { label: '50 Coins',   amount: 50,      item: 'coins',       color: '#16a34a' },
+  { label: '5 Coins',    amount: 5,  item: 'coins',        color: '#fbbf24' },
+  { label: '10 Coins',   amount: 10, item: 'coins',        color: '#f59e0b' },
+  { label: 'Try Again',  amount: 0,  item: 'nothing',      color: '#6b7280' },
+  { label: '20 Coins',   amount: 20, item: 'coins',        color: '#d97706' },
+  { label: 'XP Boost',   amount: 1,  item: 'xp_boost',     color: '#8b5cf6' },
+  { label: '30 Coins',   amount: 30, item: 'coins',        color: '#ea580c' },
+  { label: '10 Coins',   amount: 10, item: 'coins',        color: '#ca8a04' },
+  { label: '50 Coins',   amount: 50, item: 'coins',        color: '#16a34a' },
 ];
  
 const SpinWheel = () => {
@@ -60,8 +60,6 @@ const SpinWheel = () => {
   useEffect(() => {
     const lastSpin = localStorage.getItem('lastSpinDate');
     setCanSpin(lastSpin !== new Date().toDateString());
- 
-    // Start boost countdown if active
     startBoostTimer();
     return () => clearInterval(boostTimerRef.current);
   }, []);
@@ -90,13 +88,11 @@ const SpinWheel = () => {
     setSpinning(true);
     setLastResult(null);
  
-    // Determine result
     let outcome;
     try {
       const res = await gamesApi.spin();
       outcome = res.data.data.outcome;
     } catch {
-      // Demo fallback
       const weights = [30, 25, 3, 15, 5, 8, 25, 4];
       const total = weights.reduce((a, b) => a + b, 0);
       let rand = Math.random() * total;
@@ -108,7 +104,6 @@ const SpinWheel = () => {
       outcome = { item: SEGMENTS[idx].item, amount: SEGMENTS[idx].amount };
     }
  
-    // Find which segment index matches outcome
     let targetIdx = SEGMENTS.findIndex(s =>
       s.item === outcome.item && (outcome.item === 'nothing' || s.amount === outcome.amount || outcome.item === 'xp_boost')
     );
@@ -116,22 +111,13 @@ const SpinWheel = () => {
  
     const numSegments = SEGMENTS.length;
     const segAngle = 360 / numSegments;
-    // Each segment i occupies [i*segAngle, (i+1)*segAngle]
-    // We want the needle (top = 270deg in CSS) to point at segment targetIdx's center
-    // Wheel rotates clockwise: segment 0 starts at 0deg
-    // After rotating by R deg clockwise, the top of the wheel shows segment at angle (360 - R) % 360
-    const targetAngle = targetIdx * segAngle + segAngle / 2; // center of segment in wheel coords
+    const targetAngle = targetIdx * segAngle + segAngle / 2;
     const spins = 5 + Math.floor(Math.random() * 3);
     const newRotation = finalRotation + spins * 360 + (360 - targetAngle);
  
     setFinalRotation(newRotation);
+    setTimeout(() => setRotation(newRotation), 50);
  
-    // Animate
-    setTimeout(() => {
-      setRotation(newRotation);
-    }, 50);
- 
-    // After animation (5s)
     setTimeout(() => {
       setSpinning(false);
       setLastResult(outcome);
@@ -169,7 +155,6 @@ const SpinWheel = () => {
   const radius = 110;
   const cx = 130, cy = 130;
  
-  // Build SVG segments
   const buildPath = (i) => {
     const startAngle = (i * segAngle - 90) * (Math.PI / 180);
     const endAngle = ((i + 1) * segAngle - 90) * (Math.PI / 180);
@@ -183,17 +168,12 @@ const SpinWheel = () => {
   const buildTextPosition = (i) => {
     const midAngle = ((i + 0.5) * segAngle - 90) * (Math.PI / 180);
     const r = radius * 0.65;
-    return {
-      x: cx + r * Math.cos(midAngle),
-      y: cy + r * Math.sin(midAngle),
-      rotate: (i + 0.5) * segAngle,
-    };
+    return { x: cx + r * Math.cos(midAngle), y: cy + r * Math.sin(midAngle), rotate: (i + 0.5) * segAngle };
   };
  
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
       className="bg-gray-900 border border-white/5 rounded-2xl p-6">
-      {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-xl font-bold text-white">Daily Spin</h2>
@@ -209,7 +189,6 @@ const SpinWheel = () => {
         </div>
       </div>
  
-      {/* XP Boost Banner */}
       {boostStatus.active && (
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
           className="mb-4 flex items-center gap-2 px-3 py-2 bg-violet-500/10 border border-violet-500/20 rounded-xl text-xs">
@@ -219,16 +198,13 @@ const SpinWheel = () => {
         </motion.div>
       )}
  
-      {/* Wheel */}
       <div className="relative flex items-center justify-center mb-5">
-        {/* Pointer */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10" style={{ marginTop: '-2px' }}>
           <svg width="24" height="28" viewBox="0 0 24 28">
             <polygon points="12,2 22,26 2,26" fill="#fbbf24" stroke="#92400e" strokeWidth="1.5" />
           </svg>
         </div>
  
-        {/* SVG Wheel */}
         <motion.svg
           width={cx * 2} height={cy * 2}
           viewBox={`0 0 ${cx * 2} ${cy * 2}`}
@@ -236,24 +212,17 @@ const SpinWheel = () => {
           animate={{ rotate: rotation }}
           transition={{ duration: spinning ? 5 : 0, ease: [0.1, 0.9, 0.2, 1.0] }}
         >
-          {/* Outer ring */}
           <circle cx={cx} cy={cy} r={radius + 6} fill="none" stroke="#374151" strokeWidth="4" />
- 
-          {/* Segments */}
           {SEGMENTS.map((seg, i) => {
             const tp = buildTextPosition(i);
             return (
               <g key={i}>
                 <path d={buildPath(i)} fill={seg.color} stroke="#1f2937" strokeWidth="1.5" />
                 <text
-                  x={tp.x}
-                  y={tp.y}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
+                  x={tp.x} y={tp.y}
+                  textAnchor="middle" dominantBaseline="middle"
                   transform={`rotate(${tp.rotate}, ${tp.x}, ${tp.y})`}
-                  fontSize="9"
-                  fontWeight="bold"
-                  fill="white"
+                  fontSize="9" fontWeight="bold" fill="white"
                   style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
                 >
                   {seg.label}
@@ -261,8 +230,6 @@ const SpinWheel = () => {
               </g>
             );
           })}
- 
-          {/* Center circle */}
           <circle cx={cx} cy={cy} r={22} fill="#111827" stroke="#374151" strokeWidth="2" />
           <circle cx={cx} cy={cy} r={18} fill="url(#centerGrad)" />
           <defs>
@@ -273,16 +240,13 @@ const SpinWheel = () => {
           </defs>
         </motion.svg>
  
-        {/* Center spin button (overlaid) */}
         <button
           onClick={handleSpin}
           disabled={spinning || !canSpin}
           className="absolute inset-0 flex items-center justify-center"
           style={{ pointerEvents: spinning || !canSpin ? 'none' : 'auto' }}
         >
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-[10px] transition-transform ${
-            canSpin && !spinning ? 'hover:scale-110 cursor-pointer' : ''
-          }`}>
+          <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold">
             {spinning ? (
               <RotateCcw className="w-4 h-4 animate-spin" />
             ) : canSpin ? (
@@ -294,7 +258,6 @@ const SpinWheel = () => {
         </button>
       </div>
  
-      {/* Spin button (below wheel) */}
       <button
         onClick={handleSpin}
         disabled={spinning || !canSpin}
@@ -307,7 +270,6 @@ const SpinWheel = () => {
         {spinning ? 'Spinning...' : canSpin ? '🎡 Spin the Wheel!' : '✅ Already spun today'}
       </button>
  
-      {/* Result */}
       <AnimatePresence>
         {resultDisplay && (
           <motion.div
@@ -326,246 +288,420 @@ const SpinWheel = () => {
 };
  
 // ─── SPEED MATCH ─────────────────────────────────────────────────
-const DEMO_SKILLS = [
-  { id: 1, name: 'JavaScript', type: 'teach' }, { id: 2, name: 'JavaScript', type: 'learn' },
-  { id: 3, name: 'Python',     type: 'teach' }, { id: 4, name: 'Python',     type: 'learn' },
-  { id: 5, name: 'React',      type: 'teach' }, { id: 6, name: 'React',      type: 'learn' },
-  { id: 7, name: 'Guitar',     type: 'teach' }, { id: 8, name: 'Guitar',     type: 'learn' },
-  { id: 9, name: 'Spanish',    type: 'teach' }, { id: 10, name: 'Spanish',   type: 'learn' },
-  { id: 11, name: 'Piano',     type: 'teach' }, { id: 12, name: 'Piano',     type: 'learn' },
+const DEMO_PAIRS = [
+  { name: 'JavaScript' }, { name: 'Python' }, { name: 'React' },
+  { name: 'Guitar' }, { name: 'Spanish' }, { name: 'Piano' },
+  { name: 'Figma' }, { name: 'SQL' },
 ];
+ 
+const buildGameDeck = (pairs) => {
+  const deck = [];
+  pairs.forEach(({ name }) => {
+    deck.push({ uid: `${name}-teach`, name, type: 'teach' });
+    deck.push({ uid: `${name}-learn`, name, type: 'learn' });
+  });
+  // shuffle
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+};
+ 
+const GAME_DURATION = 30;
  
 const SpeedMatch = () => {
   const { fetchUser } = useAuth();
   const [phase, setPhase] = useState('idle'); // idle | playing | done
-  const [gameSkills, setGameSkills] = useState([]);
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [score, setScore] = useState(0);
+  const [deck, setDeck] = useState([]);
+  const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
   const [matched, setMatched] = useState(new Set());   // matched skill names
-  const [selected, setSelected] = useState([]);         // [{id, name, type}]
+  const [selected, setSelected] = useState([]);         // max 2 cards
   const [flashCorrect, setFlashCorrect] = useState(null);
   const [flashWrong, setFlashWrong] = useState(null);
   const [result, setResult] = useState(null);
+ 
+  // Use refs so the interval can always read current values
+  const matchedRef = useRef(new Set());
+  const scoreRef = useRef(0);
   const timerRef = useRef(null);
  
-  const endGame = useCallback(async (finalScore, finalMatched) => {
+  const stopGame = useCallback(() => {
     clearInterval(timerRef.current);
+    const finalScore = scoreRef.current;
+    const finalMatches = matchedRef.current.size;
     setPhase('done');
-    const xpEarned = finalScore;
-    const coinsEarned = Math.floor(finalScore / 3);
-    setResult({ xpEarned, coinsEarned, matchesCount: finalMatched });
-    try {
-      await gamesApi.submitSpeedMatch({ roundId: `round_${Date.now()}`, matches: [], timeTaken: 30 - timeLeft });
-    } catch { /* silent */ }
+    setResult({
+      xpEarned: finalScore,
+      coinsEarned: Math.floor(finalScore / 3),
+      matchesCount: finalMatches,
+      maxPossible: DEMO_PAIRS.length,
+    });
+    gamesApi.submitSpeedMatch({ roundId: `round_${Date.now()}`, matches: [], timeTaken: GAME_DURATION - timeLeft })
+      .catch(() => {});
     fetchUser();
-  }, [timeLeft, fetchUser]);
+  }, [fetchUser, timeLeft]);
  
   const startGame = async () => {
-    let skills = [...DEMO_SKILLS].sort(() => Math.random() - 0.5);
+    // Reset all state and refs
+    matchedRef.current = new Set();
+    scoreRef.current = 0;
+ 
+    let pairs = DEMO_PAIRS;
     try {
       const res = await gamesApi.startSpeedMatch();
-      if (res.data.data.skills?.length > 0) skills = res.data.data.skills;
+      if (res.data.data?.skills?.length >= 4) {
+        // Build pairs from API skills
+        const skillMap = {};
+        res.data.data.skills.forEach(s => {
+          const name = s.name || s.skillName;
+          skillMap[name] = (skillMap[name] || 0) + 1;
+        });
+        const apiPairs = Object.keys(skillMap).slice(0, 8).map(name => ({ name }));
+        if (apiPairs.length >= 3) pairs = apiPairs;
+      }
     } catch { /* use demo */ }
  
-    setGameSkills(skills);
-    setPhase('playing');
-    setScore(0);
+    const newDeck = buildGameDeck(pairs.slice(0, 8));
+    setDeck(newDeck);
     setMatched(new Set());
     setSelected([]);
     setFlashCorrect(null);
     setFlashWrong(null);
     setResult(null);
-    setTimeLeft(30);
+    setTimeLeft(GAME_DURATION);
+    setPhase('playing');
  
     clearInterval(timerRef.current);
-    let t = 30;
-    let localScore = 0;
-    let localMatched = 0;
+    let t = GAME_DURATION;
     timerRef.current = setInterval(() => {
       t -= 1;
       setTimeLeft(t);
       if (t <= 0) {
-        endGame(localScore, localMatched);
+        clearInterval(timerRef.current);
+        const finalScore = scoreRef.current;
+        const finalMatches = matchedRef.current.size;
+        setPhase('done');
+        setResult({
+          xpEarned: finalScore,
+          coinsEarned: Math.floor(finalScore / 3),
+          matchesCount: finalMatches,
+          maxPossible: pairs.slice(0, 8).length,
+        });
+        gamesApi.submitSpeedMatch({ roundId: `round_${Date.now()}`, matches: [], timeTaken: GAME_DURATION })
+          .catch(() => {});
+        fetchUser();
       }
     }, 1000);
   };
  
   useEffect(() => () => clearInterval(timerRef.current), []);
  
-  const handleSelect = (skill) => {
+  const handleSelect = (card) => {
     if (phase !== 'playing') return;
-    if (matched.has(skill.name)) return;
+    if (matched.has(card.name)) return;
+    if (flashWrong) return; // block during wrong-flash cooldown
  
-    const alreadySel = selected.find(s => s.id === skill.id);
-    if (alreadySel) {
-      setSelected(prev => prev.filter(s => s.id !== skill.id));
+    // Toggle deselect
+    if (selected.find(s => s.uid === card.uid)) {
+      setSelected(prev => prev.filter(s => s.uid !== card.uid));
       return;
     }
     if (selected.length >= 2) return;
  
-    const newSel = [...selected, skill];
+    const newSel = [...selected, card];
     setSelected(newSel);
  
     if (newSel.length === 2) {
       const [a, b] = newSel;
       if (a.name === b.name && a.type !== b.type) {
-        // Correct match!
+        // ✅ Correct match
         setFlashCorrect(a.name);
-        setTimeout(() => setFlashCorrect(null), 600);
         const newMatched = new Set([...matched, a.name]);
         setMatched(newMatched);
-        const newScore = score + 15;
-        setScore(newScore);
+        matchedRef.current = newMatched;
+        scoreRef.current += 15;
         setSelected([]);
-        toast.success(`+15 XP — matched ${a.name}! 🎉`, { duration: 1000 });
+        toast.success(`+15 XP — matched ${a.name}!`, { duration: 900, id: `match-${a.name}` });
+        setTimeout(() => setFlashCorrect(null), 600);
+ 
+        // Auto-end if all matched
+        if (newMatched.size === deck.length / 2) {
+          setTimeout(() => {
+            clearInterval(timerRef.current);
+            const finalScore = scoreRef.current;
+            const finalMatches = matchedRef.current.size;
+            setPhase('done');
+            setResult({
+              xpEarned: finalScore,
+              coinsEarned: Math.floor(finalScore / 3),
+              matchesCount: finalMatches,
+              maxPossible: deck.length / 2,
+            });
+            fetchUser();
+          }, 400);
+        }
       } else {
-        // Wrong
-        setFlashWrong([a.id, b.id]);
-        setTimeout(() => { setFlashWrong(null); setSelected([]); }, 700);
+        // ❌ Wrong
+        setFlashWrong([a.uid, b.uid]);
+        setTimeout(() => {
+          setFlashWrong(null);
+          setSelected([]);
+        }, 700);
       }
     }
   };
  
-  const getCardStyle = (skill) => {
-    const isMatched = matched.has(skill.name);
-    const isSel = selected.find(s => s.id === skill.id);
-    const isFlashCorrect = flashCorrect === skill.name;
-    const isFlashWrong = flashWrong?.includes(skill.id);
+  const getCardClass = (card) => {
+    const isMatched = matched.has(card.name);
+    const isSel = !!selected.find(s => s.uid === card.uid);
+    const isFC = flashCorrect === card.name;
+    const isFW = flashWrong?.includes(card.uid);
  
-    if (isFlashCorrect) return 'bg-green-500/40 border-green-500 scale-105';
-    if (isFlashWrong) return 'bg-red-500/30 border-red-500/60 scale-95';
-    if (isMatched) return 'bg-green-500/20 border-green-500/40 opacity-60';
-    if (isSel) return 'bg-sky-500/30 border-sky-500 shadow-lg shadow-sky-500/20';
-    if (skill.type === 'teach') return 'bg-sky-500/10 border-sky-500/20 hover:bg-sky-500/20 hover:border-sky-500/40';
-    return 'bg-violet-500/10 border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40';
+    if (isFC) return 'bg-green-500/40 border-green-400 scale-105 shadow-lg shadow-green-500/20';
+    if (isFW) return 'bg-red-500/30 border-red-500/70 scale-95 opacity-80';
+    if (isMatched) return 'bg-green-500/15 border-green-500/30 opacity-50 cursor-default';
+    if (isSel) return card.type === 'teach'
+      ? 'bg-sky-500/40 border-sky-400 shadow-lg shadow-sky-500/25 scale-105'
+      : 'bg-violet-500/40 border-violet-400 shadow-lg shadow-violet-500/25 scale-105';
+    if (card.type === 'teach') return 'bg-sky-500/10 border-sky-500/25 hover:bg-sky-500/20 hover:border-sky-400/50 hover:scale-105';
+    return 'bg-violet-500/10 border-violet-500/25 hover:bg-violet-500/20 hover:border-violet-400/50 hover:scale-105';
   };
  
+  const timerPct = (timeLeft / GAME_DURATION) * 100;
   const timerColor = timeLeft <= 5 ? 'text-red-400' : timeLeft <= 10 ? 'text-orange-400' : 'text-white';
+  const barColor = timeLeft <= 5 ? 'bg-red-500' : timeLeft <= 10 ? 'bg-orange-500' : 'bg-sky-500';
  
-  return (
-    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-      className="bg-gray-900 border border-white/5 rounded-2xl p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h2 className="text-xl font-bold text-white">Speed Match</h2>
-          <p className="text-sm text-gray-400">Match teachers with learners!</p>
+  // ── IDLE ──
+  if (phase === 'idle') {
+    return (
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+        className="bg-gray-900 border border-white/5 rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-white">Speed Match</h2>
+            <p className="text-sm text-gray-400">Match teachers with learners!</p>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/10 border border-sky-500/20 rounded-full text-xs font-semibold text-sky-400">
+            <Zap className="w-3.5 h-3.5" /> +15 XP/match
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/10 border border-sky-500/20 rounded-full text-xs font-semibold text-sky-400">
-          <Zap className="w-3.5 h-3.5" /> +15 XP/match
-        </div>
-      </div>
  
-      {phase === 'idle' && (
-        <div className="text-center py-8">
-          <div className="w-16 h-16 bg-sky-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Target className="w-8 h-8 text-sky-400" />
-          </div>
-          <h3 className="text-lg font-bold text-white mb-2">Test Your Matching Skills!</h3>
-          <p className="text-gray-400 text-sm mb-2">
-            Match <span className="text-sky-400 font-semibold">📚 teachers</span> with{' '}
-            <span className="text-violet-400 font-semibold">🎯 learners</span> having the same skill.
-          </p>
-          <p className="text-gray-600 text-xs mb-6">30 seconds · 15 XP per match</p>
-          <button onClick={startGame} className="px-8 py-3 bg-gradient-to-r from-sky-500 to-violet-600 hover:from-sky-400 hover:to-violet-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-sky-500/20">
-            Start Game
-          </button>
-        </div>
-      )}
- 
-      {phase === 'playing' && (
-        <>
-          {/* HUD */}
-          <div className="flex items-center justify-between mb-4 px-1">
-            <div className="flex items-center gap-2">
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${timeLeft <= 10 ? 'bg-red-500/10 border border-red-500/20' : 'bg-gray-800'}`}>
-                <Timer className="w-4 h-4 text-gray-400" />
-                <span className={`font-bold text-lg tabular-nums ${timerColor}`}>{timeLeft}s</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-400/10 border border-yellow-400/15 rounded-lg">
-                <Trophy className="w-4 h-4 text-yellow-400" />
-                <span className="font-bold text-yellow-400 tabular-nums">{score}</span>
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 border border-green-500/15 rounded-lg">
-                <CheckCircle className="w-4 h-4 text-green-400" />
-                <span className="font-bold text-green-400 tabular-nums">{matched.size}</span>
-              </div>
-            </div>
-          </div>
- 
-          {/* Timer bar */}
-          <div className="w-full h-1.5 bg-gray-800 rounded-full mb-4 overflow-hidden">
-            <motion.div
-              className={`h-full rounded-full transition-colors duration-300 ${timeLeft > 10 ? 'bg-sky-500' : 'bg-red-500'}`}
-              style={{ width: `${(timeLeft / 30) * 100}%` }}
-              transition={{ duration: 1, ease: 'linear' }}
-            />
-          </div>
- 
-          {/* Legend */}
-          <div className="flex gap-3 mb-3 text-xs">
-            <span className="flex items-center gap-1 text-sky-400"><span className="w-2 h-2 rounded-full bg-sky-500 inline-block" /> 📚 Teacher</span>
-            <span className="flex items-center gap-1 text-violet-400"><span className="w-2 h-2 rounded-full bg-violet-500 inline-block" /> 🎯 Learner</span>
-            {selected.length > 0 && (
-              <span className="ml-auto text-gray-500">Selected: {selected.map(s => s.name).join(' + ')}</span>
-            )}
-          </div>
- 
-          {/* Grid */}
-          <div className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto">
-            {gameSkills.map((skill) => {
-              const name = typeof skill === 'object' ? (skill.name || skill.skillName) : skill;
-              const type = typeof skill === 'object' ? skill.type : 'teach';
-              const id = skill.id || `${name}-${type}`;
-              const s = { id, name, type };
-              const isMatched = matched.has(name);
- 
-              return (
-                <motion.button
-                  key={id}
-                  whileTap={!isMatched ? { scale: 0.95 } : {}}
-                  onClick={() => handleSelect(s)}
-                  disabled={isMatched}
-                  className={`p-2.5 rounded-xl border text-center transition-all duration-150 ${getCardStyle(s)}`}
-                >
-                  <p className="text-xs font-bold text-white truncate">{name}</p>
-                  <p className="text-[10px] mt-0.5">{type === 'teach' ? '📚' : '🎯'}</p>
-                  {isMatched && <p className="text-[10px] text-green-400 font-bold">✓</p>}
-                </motion.button>
-              );
-            })}
-          </div>
-        </>
-      )}
- 
-      {phase === 'done' && result && (
         <div className="text-center py-6">
-          <div className="text-5xl mb-4">{result.matchesCount >= 4 ? '🏆' : result.matchesCount >= 2 ? '⭐' : '🎮'}</div>
-          <h3 className="text-xl font-bold text-white mb-1">
-            {result.matchesCount >= 4 ? 'Amazing!' : result.matchesCount >= 2 ? 'Good job!' : 'Keep practicing!'}
-          </h3>
-          <p className="text-gray-400 text-sm mb-4">{result.matchesCount} matches in 30 seconds</p>
- 
-          <div className="flex justify-center gap-4 mb-6">
-            <div className="px-4 py-3 bg-yellow-400/10 border border-yellow-400/20 rounded-xl">
-              <p className="text-2xl font-black text-yellow-400">+{result.xpEarned}</p>
-              <p className="text-xs text-gray-500">XP</p>
+          <div className="w-20 h-20 bg-gradient-to-br from-sky-500/20 to-violet-500/20 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-sky-500/20">
+            <Target className="w-10 h-10 text-sky-400" />
+          </div>
+          <h3 className="text-xl font-bold text-white mb-3">How to Play</h3>
+          <div className="space-y-2 text-sm text-gray-400 mb-6 text-left max-w-xs mx-auto">
+            <div className="flex items-start gap-2">
+              <span className="text-sky-400 font-bold shrink-0">1.</span>
+              Click a <span className="text-sky-400 font-medium mx-1">📚 Teacher</span> card and a matching <span className="text-violet-400 font-medium mx-1">🎯 Learner</span> card with the same skill.
             </div>
-            <div className="px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+            <div className="flex items-start gap-2">
+              <span className="text-sky-400 font-bold shrink-0">2.</span>
+              Each correct pair earns <span className="text-yellow-400 font-medium mx-1">+15 XP</span> and <span className="text-amber-400 font-medium mx-1">+5 coins</span>.
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-sky-400 font-bold shrink-0">3.</span>
+              Match as many pairs as you can in <span className="text-white font-medium mx-1">30 seconds</span>!
+            </div>
+          </div>
+          <button
+            onClick={startGame}
+            className="px-10 py-3.5 bg-gradient-to-r from-sky-500 to-violet-600 hover:from-sky-400 hover:to-violet-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-sky-500/20 hover:shadow-sky-500/30 hover:scale-105 active:scale-95"
+          >
+            Start Game 🚀
+          </button>
+          <p className="text-xs text-gray-600 mt-3">30 seconds · Up to {DEMO_PAIRS.length} pairs</p>
+        </div>
+      </motion.div>
+    );
+  }
+ 
+  // ── PLAYING ──
+  if (phase === 'playing') {
+    return (
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+        className="bg-gray-900 border border-white/5 rounded-2xl p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-white">Speed Match</h2>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/10 border border-sky-500/20 rounded-full text-xs font-semibold text-sky-400">
+            <Zap className="w-3.5 h-3.5" /> +15 XP/match
+          </div>
+        </div>
+ 
+        {/* HUD */}
+        <div className="flex items-center justify-between mb-3">
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${timeLeft <= 10 ? 'bg-red-500/10 border-red-500/30' : 'bg-gray-800 border-white/5'}`}>
+            <Timer className={`w-4 h-4 ${timerColor}`} />
+            <span className={`font-black text-xl tabular-nums ${timerColor}`}>{timeLeft}s</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-xl">
+              <CheckCircle className="w-4 h-4 text-green-400" />
+              <span className="font-bold text-green-400 tabular-nums text-sm">{matched.size}/{deck.length / 2}</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-400/10 border border-yellow-400/20 rounded-xl">
+              <Trophy className="w-4 h-4 text-yellow-400" />
+              <span className="font-bold text-yellow-400 tabular-nums text-sm">{scoreRef.current} XP</span>
+            </div>
+          </div>
+        </div>
+ 
+        {/* Timer bar */}
+        <div className="w-full h-1.5 bg-gray-800 rounded-full mb-4 overflow-hidden">
+          <motion.div
+            className={`h-full rounded-full transition-colors duration-300 ${barColor}`}
+            style={{ width: `${timerPct}%` }}
+            transition={{ duration: 1, ease: 'linear' }}
+          />
+        </div>
+ 
+        {/* Legend + selection hint */}
+        <div className="flex items-center justify-between mb-3 text-xs">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1 text-sky-400">
+              <span className="w-2 h-2 rounded-full bg-sky-500 inline-block" />
+              📚 Teacher
+            </span>
+            <span className="flex items-center gap-1 text-violet-400">
+              <span className="w-2 h-2 rounded-full bg-violet-500 inline-block" />
+              🎯 Learner
+            </span>
+          </div>
+          {selected.length === 1 && (
+            <span className="text-gray-400 italic">
+              Selected: <span className="text-white font-medium">{selected[0].name}</span> — now pick its pair!
+            </span>
+          )}
+        </div>
+ 
+        {/* Card grid */}
+        <div className="grid grid-cols-4 gap-2">
+          {deck.map((card) => (
+            <motion.button
+              key={card.uid}
+              whileTap={!matched.has(card.name) ? { scale: 0.93 } : {}}
+              onClick={() => handleSelect(card)}
+              disabled={matched.has(card.name) || !!flashWrong}
+              className={`aspect-square rounded-xl border text-center transition-all duration-150 flex flex-col items-center justify-center gap-0.5 p-1.5 ${getCardClass(card)}`}
+            >
+              <span className="text-base leading-none">
+                {matched.has(card.name) ? '✅' : card.type === 'teach' ? '📚' : '🎯'}
+              </span>
+              <p className="text-[10px] font-bold text-white leading-tight truncate w-full text-center">
+                {card.name}
+              </p>
+            </motion.button>
+          ))}
+        </div>
+      </motion.div>
+    );
+  }
+ 
+  // ── DONE ──
+  if (phase === 'done' && result) {
+    const pct = result.maxPossible > 0 ? (result.matchesCount / result.maxPossible) * 100 : 0;
+    const rating = pct === 100 ? 3 : pct >= 50 ? 2 : pct > 0 ? 1 : 0;
+    const messages = [
+      { emoji: '😅', title: 'Keep Practicing!', sub: 'Try again to improve your score.' },
+      { emoji: '⭐', title: 'Not Bad!', sub: 'You\'re getting the hang of it.' },
+      { emoji: '🌟', title: 'Great Job!', sub: 'Solid performance!' },
+      { emoji: '🏆', title: 'Perfect Match!', sub: 'You matched everything!' },
+    ];
+    const msg = messages[rating];
+ 
+    return (
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+        className="bg-gray-900 border border-white/5 rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-xl font-bold text-white">Speed Match</h2>
+          <span className="text-xs text-gray-500">Game Over</span>
+        </div>
+ 
+        {/* Hero result */}
+        <div className="text-center py-4">
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 12 }}
+            className="text-6xl mb-3"
+          >
+            {msg.emoji}
+          </motion.div>
+          <h3 className="text-2xl font-black text-white mb-1">{msg.title}</h3>
+          <p className="text-gray-400 text-sm mb-5">{msg.sub}</p>
+ 
+          {/* Stars */}
+          <div className="flex justify-center gap-2 mb-6">
+            {[0, 1, 2].map(i => (
+              <motion.div
+                key={i}
+                initial={{ scale: 0, rotate: -30 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: 0.15 * i, type: 'spring', stiffness: 300 }}
+              >
+                <Star
+                  className={`w-8 h-8 ${i < rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-700'}`}
+                />
+              </motion.div>
+            ))}
+          </div>
+ 
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+              className="bg-gray-800 border border-white/5 rounded-xl p-3"
+            >
+              <p className="text-2xl font-black text-green-400">{result.matchesCount}<span className="text-sm text-gray-500">/{result.maxPossible}</span></p>
+              <p className="text-xs text-gray-500 mt-0.5">Pairs Matched</p>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+              className="bg-yellow-400/10 border border-yellow-400/20 rounded-xl p-3"
+            >
+              <p className="text-2xl font-black text-yellow-400">+{result.xpEarned}</p>
+              <p className="text-xs text-gray-500 mt-0.5">XP Earned</p>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+              className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3"
+            >
               <p className="text-2xl font-black text-amber-400">+{result.coinsEarned}</p>
-              <p className="text-xs text-gray-500">Coins</p>
+              <p className="text-xs text-gray-500 mt-0.5">Coins Earned</p>
+            </motion.div>
+          </div>
+ 
+          {/* Accuracy bar */}
+          <div className="mb-6">
+            <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+              <span>Accuracy</span>
+              <span className="font-semibold text-white">{Math.round(pct)}%</span>
+            </div>
+            <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-sky-500 to-violet-500 rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${pct}%` }}
+                transition={{ duration: 0.8, delay: 0.4, ease: 'easeOut' }}
+              />
             </div>
           </div>
  
-          <button onClick={startGame} className="px-8 py-3 bg-gradient-to-r from-sky-500 to-violet-600 hover:from-sky-400 hover:to-violet-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-sky-500/20">
-            Play Again
+          <button
+            onClick={startGame}
+            className="w-full py-3.5 bg-gradient-to-r from-sky-500 to-violet-600 hover:from-sky-400 hover:to-violet-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-sky-500/20 hover:scale-105 active:scale-95"
+          >
+            Play Again 🔄
           </button>
         </div>
-      )}
-    </motion.div>
-  );
+      </motion.div>
+    );
+  }
+ 
+  return null;
 };
  
 export default Games;
