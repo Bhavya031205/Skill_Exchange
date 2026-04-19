@@ -20,7 +20,7 @@ psql --version   # Should show 15.x or higher
 ---
 
 ## Project Structure
-
+#
 ```
 C:\Users\Bhavya\SkillSwap\
 ├── backend/                 # Node.js + Express API
