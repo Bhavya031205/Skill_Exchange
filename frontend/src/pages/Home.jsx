@@ -76,7 +76,7 @@ export default function Home() {
           </Link>
           <div className="flex items-center gap-3">
             <Link to="/login" className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">
-              Sign in
+              Sign in / Login in 
             </Link>
             <Link to="/register" className="px-4 py-2 text-sm font-semibold bg-gradient-to-r from-sky-500 to-violet-600 hover:from-sky-400 hover:to-violet-500 text-white rounded-xl transition-all shadow-lg shadow-sky-500/20">
               Get Started Free
@@ -163,35 +163,50 @@ export default function Home() {
         </motion.div>
       </section>
  
-      {/* ─── STATS ─── */}
-      <section className="py-20 border-y border-white/5 bg-gray-900/40">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {[
-              { to: 10000, suffix: '+', label: 'Active Learners', icon: Users, color: 'text-sky-400' },
-              { to: 50000, suffix: '+', label: 'Skills Exchanged', icon: Zap, color: 'text-violet-400' },
-              { to: 4.9, suffix: '★', label: 'Average Rating', icon: Star, color: 'text-yellow-400', isFloat: true },
-              { to: 100, suffix: '%', label: 'Free Forever', icon: Coins, color: 'text-green-400' },
-            ].map((s, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="text-center"
-              >
-                <s.icon className={`w-6 h-6 ${s.color} mx-auto mb-3`} />
-                <p className={`text-4xl font-black ${s.color} tabular-nums`}>
-                  {s.isFloat ? s.to : <Counter to={s.to} suffix={s.suffix} />}
-                  {s.isFloat ? s.suffix : ''}
-                </p>
-                <p className="text-gray-500 text-sm mt-1">{s.label}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+{/* ─── STATS ─── */}
+<section className="py-20 border-y border-white/5 bg-gray-900/40">
+  <div className="max-w-5xl mx-auto px-6">
+    
+    {/* FLEX INSTEAD OF GRID (auto-center no matter item count) */}
+    <div className="flex flex-wrap justify-center items-center gap-10">
+      
+      {[
+        { to: 4.9, suffix: '★', label: 'Average Rating', icon: Star, color: 'text-yellow-400', isFloat: true },
+        { to: 100, suffix: '%', label: 'Free Forever', icon: Coins, color: 'text-green-400' },
+      ].map((s, i) => (
+        
+        <motion.div
+          key={i}
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: i * 0.1 }}
+          
+          className="text-center min-w-[140px]"
+        >
+          
+          {/* ICON */}
+          <s.icon className={`w-7 h-7 ${s.color} mx-auto mb-3`} />
+          
+          {/* NUMBER */}
+          <p className={`text-4xl font-black ${s.color} tabular-nums`}>
+            {s.isFloat 
+              ? `${s.to}${s.suffix}` 
+              : <Counter to={s.to} suffix={s.suffix} />
+            }
+          </p>
+          
+          {/* LABEL */}
+          <p className="text-gray-400 text-sm mt-1">
+            {s.label}
+          </p>
+          
+        </motion.div>
+      ))}
+      
+    </div>
+  </div>
+</section>
  
       {/* ─── HOW IT WORKS ─── */}
       <section className="py-24">
@@ -432,7 +447,7 @@ export default function Home() {
               <Link key={l} to={`/${l.toLowerCase()}`} className="hover:text-gray-400 transition-colors">{l}</Link>
             ))}
           </div>
-          <p className="text-gray-700 text-xs">© 2025 SkillSwap · Made with ❤️ for learners</p>
+          <p className="text-gray-700 text-xs">© 2025 SkillSwap</p>
         </div>
       </footer>
     </div>

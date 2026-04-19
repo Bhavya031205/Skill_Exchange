@@ -22,16 +22,7 @@ const Footer = () => {
               A peer-to-peer skill exchange platform where students learn from each other.
             </p>
             <div className="flex items-center gap-3 mt-5">
-              <a href="#" className="w-8 h-8 bg-gray-800 hover:bg-gray-700 border border-white/5 rounded-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors">
-                <Twitter className="w-4 h-4" />
-              </a>
-              <a href="#" className="w-8 h-8 bg-gray-800 hover:bg-gray-700 border border-white/5 rounded-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors">
-                <Instagram className="w-4 h-4" />
-              </a>
-              <a href="#" className="w-8 h-8 bg-gray-800 hover:bg-gray-700 border border-white/5 rounded-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors">
-                <Github className="w-4 h-4" />
-              </a>
-              <a href="mailto:hello@skillswap.app" className="w-8 h-8 bg-gray-800 hover:bg-gray-700 border border-white/5 rounded-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors">
+              <a href="mailto:bhavya.235927101@vcet.edu.in" className="w-8 h-8 bg-gray-800 hover:bg-gray-700 border border-white/5 rounded-lg flex items-center justify-center text-gray-400 hover:text-white transition-colors">
                 <Mail className="w-4 h-4" />
               </a>
             </div>
